@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>River Run</title>
 
   <!--
@@ -23,18 +23,28 @@
       margin: 0; height: 100%;
       background: #07131f; color: #e8f3ff;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none; user-select: none;
     }
     body {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 12px; padding: 16px; box-sizing: border-box; text-align: center;
+      gap: 8px; padding: 10px; box-sizing: border-box; text-align: center;
+      height: 100dvh; min-height: 100dvh; overflow: hidden; overscroll-behavior: none;
     }
     h1 { margin: 0; font-size: 26px; letter-spacing: 1px; }
     .byline { margin: 2px 0 0; font-size: 13px; color: #9fb6cc; }
     .byline b { color: #ffd76a; }
 
-    #stage { position: relative; width: 100%; max-width: 460px; }
+    /* Fits any screen: width is limited by BOTH the viewport width and height,
+       so the whole game stays on screen on phones, iPads, and computers. */
+    #stage {
+      position: relative;
+      width: min(94vw, 46dvh);
+      aspect-ratio: 460 / 720;
+      margin: 0 auto;
+    }
     canvas {
-      display: block; width: 100%; height: auto;
+      display: block; width: 100%; height: 100%;
       background: #1c6699; border-radius: 16px;
       box-shadow: 0 12px 40px rgba(0,0,0,0.55); touch-action: none;
     }
@@ -108,13 +118,55 @@
     .controls { display: flex; gap: 10px; }
     .controls button {
       background: #14334c; color: #eaf4ff; border: 2px solid #2b5a80;
-      border-radius: 12px; padding: 10px 16px; font-size: 15px; font-weight: 700; cursor: pointer;
+      border-radius: 12px; padding: 11px 22px; font-size: 16px; font-weight: 700; cursor: pointer;
+      touch-action: manipulation;
     }
     .controls button:active { background: #1a466a; }
     p.hint { margin: 0; max-width: 460px; font-size: 13px; color: #9fb6cc; line-height: 1.5; }
     p.tweak { margin: 0; max-width: 460px; font-size: 12px; color: #7f96ad;
       background: #0e2233; padding: 9px 13px; border-radius: 10px; }
     b.k { color: #ffd76a; }
+
+    /* On phones / short screens, hide the desktop tip text so the game fits. */
+    @media (max-width: 640px), (max-height: 780px) {
+      h1 { font-size: 21px; }
+      .byline { font-size: 11px; }
+      p.hint, p.tweak { display: none; }
+    }
+
+    /* ---- Cartoony E Brothers Gaming Corp. splash ---- */
+    #splash {
+      position: absolute; inset: 0; display: none; z-index: 5; cursor: pointer; overflow: hidden;
+      flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+      background: radial-gradient(circle at 50% 36%, #2a86c4, #0a2740 78%);
+      border-radius: 16px;
+    }
+    #splash .pres { font-size: 13px; color: #cfe7ff; letter-spacing: 3px; text-transform: uppercase;
+      animation: fadeUp .5s ease backwards .15s; }
+    #splash .logo { display: flex; flex-wrap: wrap; justify-content: center; line-height: 1; }
+    #splash .logo span {
+      font-size: clamp(30px, 9vw, 46px); font-weight: 900;
+      font-family: "Comic Sans MS", "Chalkboard SE", system-ui, sans-serif;
+      display: inline-block;
+      animation: drop .6s cubic-bezier(.28,1.6,.5,1) backwards;
+      text-shadow: 0 3px 0 rgba(0,0,0,.28), 0 0 1px #000;
+    }
+    #splash .logo .sp { width: .35em; }
+    #splash .corp {
+      font-size: clamp(20px, 6vw, 30px); font-weight: 900; color: #ffd76a; letter-spacing: 1px;
+      font-family: "Comic Sans MS", "Chalkboard SE", system-ui, sans-serif;
+      text-shadow: 0 3px 0 rgba(0,0,0,.28);
+      animation: pop .55s cubic-bezier(.3,1.8,.5,1) backwards 1s;
+    }
+    #splash .crew { font-size: 40px; animation: pop .5s ease backwards 1.25s; }
+    #splash .crew .b { display:inline-block; animation: bob 1s ease-in-out infinite 1.4s; }
+    #splash .crew .b2 { display:inline-block; animation: bob 1s ease-in-out infinite 1.6s; }
+    #splash .tap { font-size: 12px; color: #bcd9f2; margin-top: 6px; animation: fadeUp .5s ease backwards 1.9s, wink 1.1s ease-in-out infinite 2.4s; }
+    @keyframes drop { from { transform: translateY(-140%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes pop { 0%{transform:scale(0); opacity:0} 70%{transform:scale(1.18); opacity:1} 100%{transform:scale(1); opacity:1} }
+    @keyframes fadeUp { from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:translateY(0)} }
+    @keyframes bob { 0%,100%{transform:translateY(0) rotate(-4deg)} 50%{transform:translateY(-8px) rotate(4deg)} }
+    @keyframes wink { 0%,100%{opacity:.5} 50%{opacity:1} }
   </style>
 </head>
 <body>
@@ -124,6 +176,7 @@
   <div id="stage">
     <canvas id="game" width="460" height="720"></canvas>
     <div id="overlay"></div>
+    <div id="splash"></div>
   </div>
 
   <div class="controls">
@@ -148,6 +201,7 @@
   const ctx = canvas.getContext("2d");
   const W = canvas.width, H = canvas.height;
   const overlay = document.getElementById("overlay");
+  const splash = document.getElementById("splash");
   const EMOJI_FONT = "'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif";
   const UI_FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 
@@ -250,6 +304,7 @@
       upgrades: (s.upgrades && typeof s.upgrades === "object") ? s.upgrades : {},
       chosenBoat: typeof s.chosenBoat === "string" ? s.chosenBoat : "canoe",
       lastName: typeof s.lastName === "string" ? s.lastName : "",
+      olive: !!s.olive,            // Olive the cavapoo joins after Level 7 (and stays!)
     };
   }
   function persist() { try { localStorage.setItem("riverRunSave", JSON.stringify(save)); } catch (e) {} }
@@ -270,7 +325,7 @@
   let state = "select";          // select | play | levelComplete | dock | over
   let dockFrom = "select";
   let level = 1, levelTime = 0, score = 0, lives = settings.lives;
-  let playerName = null, newlyUnlocked = null;
+  let playerName = null, newlyUnlocked = null, oliveJustJoined = false;
   let checkpointLevel = 0, checkpointScore = 0;
 
   let obstacles = [], coins = [], particles = [], floaters = [];
@@ -362,6 +417,7 @@
   const sShield = () => { tone(700, 0.12, "square", 0.05); tone(500, 0.16, "square", 0.05, 0.05); };
   const sBuy    = () => { tone(880, 0.1, "triangle", 0.06); tone(1175, 0.12, "triangle", 0.06, 0.07); };
   const sRapids = () => noiseBurst(0.6, 900, 0.07);
+  const sBark   = () => { tone(440, 0.07, "square", 0.05); tone(620, 0.07, "square", 0.05, 0.08); };
   function toggleMute() {
     muted = !muted; if (masterGain) masterGain.gain.value = muted ? 0 : 1;
     document.getElementById("muteBtn").textContent = muted ? "🔇" : "🔊";
@@ -457,6 +513,8 @@
     for (const key in BOATS)
       if (BOATS[key].unlockLevel === level && !save.ownedBoats.includes(key)) { save.ownedBoats.push(key); newlyUnlocked = key; }
     if (level % settings.checkpointEvery === 0) { checkpointLevel = level; checkpointScore = Math.floor(score); }
+    oliveJustJoined = false;
+    if (completed === 7 && !save.olive) { save.olive = true; oliveJustJoined = true; }   // 🐶 surprise!
     persist();
     state = "levelComplete"; sLevel(); showLevelComplete(completed);
   }
@@ -611,6 +669,7 @@
         floatText(c.x, c.y, "+" + c.value, c.gem ? "#9fe8ff" : "#ffe27a");
         burst(c.x, c.y, c.gem ? "#9fe8ff" : "#ffe27a", c.gem ? 16 : 10);
         c.gem ? sGem() : sCoin();
+        if (save.olive && Math.random() < 0.25) sBark();   // Olive cheers you on 🐶
       }
     }
   }
@@ -698,16 +757,34 @@
 
   function paintForestEdges() {
     // Sandy shoreline next to the water
-    ctx.fillStyle = "#d8c38f";
-    ctx.fillRect(BANK - 13, 0, 13, H); ctx.fillRect(W - BANK, 0, 13, H);
-    ctx.fillStyle = "rgba(0,0,0,0.12)";
+    ctx.fillStyle = "#e0cb95";
+    ctx.fillRect(BANK - 15, 0, 15, H); ctx.fillRect(W - BANK, 0, 15, H);
+    ctx.fillStyle = "rgba(0,0,0,0.10)";
     ctx.fillRect(BANK - 2, 0, 2, H); ctx.fillRect(W - BANK, 0, 2, H);
-    // Pine trees scrolling down both banks (gives the "moving downriver" feel)
-    for (let i = 0; i < 9; i++) {
-      const y = ((i * 95 + waterScroll * 0.85) % (H + 120)) - 60;
-      drawPine(BANK * 0.42, y, 26 + (i % 3) * 5);
-      drawPine(W - BANK * 0.5, y + 48, 24 + (i % 2) * 6);
+    // Pines + grass + rocks scrolling down both banks (the "moving downriver" feel)
+    for (let i = 0; i < 12; i++) {
+      const yL = ((i * 70 + waterScroll * 0.85) % (H + 150)) - 75;
+      drawPine(BANK * 0.36, yL, 24 + (i % 3) * 6);
+      drawPine(BANK * 0.66, yL + 34, 18 + (i % 2) * 5);
+      grassTuft(BANK - 8, yL + 52);
+      if (i % 4 === 0) bankRock(BANK * 0.5, yL + 16);
+      const yR = ((i * 70 + 35 + waterScroll * 0.85) % (H + 150)) - 75;
+      drawPine(W - BANK * 0.36, yR, 24 + (i % 3) * 6);
+      drawPine(W - BANK * 0.66, yR + 34, 18 + (i % 2) * 5);
+      grassTuft(W - BANK + 8, yR + 52);
+      if (i % 4 === 2) bankRock(W - BANK * 0.5, yR + 16);
     }
+  }
+  function grassTuft(x, y) {
+    ctx.strokeStyle = "#5fae54"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y); ctx.lineTo(x - 3, y - 6);
+    ctx.moveTo(x, y); ctx.lineTo(x, y - 7);
+    ctx.moveTo(x, y); ctx.lineTo(x + 3, y - 6); ctx.stroke();
+  }
+  function bankRock(x, y) {
+    ctx.fillStyle = "#b9a98a"; ctx.beginPath(); ctx.ellipse(x, y, 9, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#9c8c6e"; ctx.beginPath(); ctx.ellipse(x + 2, y + 1, 5, 3, 0, 0, Math.PI * 2); ctx.fill();
   }
   function drawPine(x, y, s) {
     ctx.fillStyle = "#5a3a1e";
@@ -823,6 +900,7 @@
     if (invincT > 0) alpha *= 0.4 + 0.6 * Math.abs(Math.sin(gameClock * 20));
     ctx.globalAlpha = alpha;
     if (BOATS[chosenBoat].draw === "sub") drawSub(size); else drawEmoji(BOATS[chosenBoat].emoji, 0, 0, size);
+    if (save.olive) drawOlive(-size * 0.18, -size * 0.16, size * 0.46);   // 🐶 riding along
     if (save.upgrades.crown) drawEmoji("👑", 0, -size * 0.46, size * 0.5);
     if (save.upgrades.flag)  drawEmoji("🚩", size * 0.34, -size * 0.34, size * 0.5);
     ctx.globalAlpha = 1;
@@ -838,6 +916,22 @@
     ctx.fillStyle = "#d9a91f"; roundRect(-size * 0.12, -size * 0.4, size * 0.24, size * 0.2, 4); ctx.fill();
     ctx.fillStyle = "#bfe3ff"; ctx.beginPath(); ctx.arc(size * 0.16, 0, size * 0.12, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = "#9a7c12"; ctx.lineWidth = 2; ctx.stroke();
+  }
+  // Olive the cavapoo 🐶 — a cream/apricot puppy who joins after Level 7.
+  function drawOlive(x, y, s) {
+    ctx.save(); ctx.translate(x, y);
+    const apricot = "#e3b083", apricotD = "#c9914f", cream = "#f6e6d0", dark = "#3a2a1a";
+    ctx.fillStyle = apricot; ctx.beginPath(); ctx.ellipse(0, s * 0.2, s * 0.34, s * 0.27, 0, 0, Math.PI * 2); ctx.fill();        // body
+    ctx.fillStyle = apricotD;                                                                                                    // floppy ears
+    ctx.beginPath(); ctx.ellipse(-s * 0.27, -s * 0.04, s * 0.13, s * 0.21, 0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(s * 0.27, -s * 0.04, s * 0.13, s * 0.21, -0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = cream; ctx.beginPath(); ctx.arc(0, -s * 0.12, s * 0.3, 0, Math.PI * 2); ctx.fill();                           // head
+    ctx.fillStyle = dark;                                                                                                        // eyes + nose
+    ctx.beginPath(); ctx.arc(-s * 0.1, -s * 0.15, s * 0.05, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(s * 0.1, -s * 0.15, s * 0.05, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, -s * 0.04, s * 0.055, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#ff8fa3"; ctx.beginPath(); ctx.ellipse(0, s * 0.04, s * 0.04, s * 0.05, 0, 0, Math.PI * 2); ctx.fill();      // tongue
+    ctx.restore();
   }
 
   function drawEmoji(emoji, x, y, size) {
@@ -883,6 +977,34 @@
       const me = mine && e.name === mine.name && e.score === mine.score && e.level === mine.level;
       return `<li class="${me ? "me" : ""}"><span>${escapeHtml(e.name)}</span><b>${e.score}</b><em>Lv ${e.level}</em></li>`;
     }).join("") + "</ol>";
+  }
+
+  function showSplash() {
+    state = "splash";
+    const word = "E BROTHERS";
+    const colors = ["#ff6b6b", "#ffd166", "#7bdff2", "#b794f6", "#80ed99", "#ff9f1c", "#5fb0ff", "#ffd166", "#7bdff2", "#80ed99"];
+    let letters = "", ci = 0;
+    for (const ch of word) {
+      if (ch === " ") { letters += '<span class="sp"></span>'; continue; }
+      letters += `<span style="color:${colors[ci % colors.length]};animation-delay:${(0.15 + ci * 0.08).toFixed(2)}s">${ch}</span>`; ci++;
+    }
+    splash.innerHTML = `
+      <div class="pres">presents</div>
+      <div class="logo">${letters}</div>
+      <div class="corp">GAMING CORP.</div>
+      <div class="crew"><span class="b">🛶</span> <span class="b2">🐶</span></div>
+      <div class="tap">tap to start</div>`;
+    splash.style.display = "flex";
+    let done = false;
+    const go = () => {
+      if (done) return; done = true;
+      clearTimeout(tid); splash.onclick = null; window.removeEventListener("keydown", skip);
+      splash.style.display = "none"; showSelect();
+    };
+    const skip = () => go();
+    splash.onclick = () => { ensureAudio(); go(); };
+    window.addEventListener("keydown", skip, { once: true });
+    const tid = setTimeout(go, 3600);
   }
 
   function showSelect() {
@@ -942,6 +1064,7 @@
   function showLevelComplete(completed) {
     let html = `<h2>Level ${completed} complete! 🎉</h2><p>Score: <b>${Math.floor(score)}</b> · Budget: <b>${save.wallet} 🪙</b></p>`;
     if (level % settings.checkpointEvery === 0) html += `<p>⛳ <b>Checkpoint reached — Level ${level}!</b></p>`;
+    if (oliveJustJoined) html += `<p style="font-size:15px;background:#16513c;border-radius:10px;padding:9px 11px;">🐶 <b>Surprise! Olive the Cavapoo hopped aboard your boat!</b> She rides with you from now on. 🎉</p>`;
     if (completed === 1) {
       const pref = escapeHtml(playerName || save.lastName || "");
       html += `<p>For the leaderboard — who's playing? Keep the name or type a new one (a different player can take over), then Save. Optional.</p>
@@ -1003,7 +1126,7 @@
     update(dt, sec); draw();
     requestAnimationFrame(loop);
   }
-  showSelect();
+  showSplash();
   requestAnimationFrame(loop);
   </script>
 </body>

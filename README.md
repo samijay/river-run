@@ -8,7 +8,7 @@ start showing up.
 Built to be **easy to change** so the nephews can learn by tinkering. The whole game is one
 file (`index.html`) with friendly comments and a clearly-marked **TWEAK ZONE**.
 
-**▶ Play it online:** https://river-run-lyart.vercel.app
+**▶ Play it online:** https://sunriverrun.vercel.app
 
 *A game by **Ezra & Eli Simon-Harris** — 🎮 E Brothers Gaming Corp. · June 9, 2026*
 
