@@ -232,7 +232,7 @@
     waterTop:    "#49a9c0",     // teal "shallows" near the banks
     waterBottom: "#1d6699",     // deep blue in the middle
     bankColor:   "#2f7d44",     // forest green banks
-    bgChannelOpacity: 0.9,      // with a background photo, how opaque the play river is (1 = hide the photo there)
+    bgChannelOpacity: 0.95,     // with a background photo, how opaque the play river is (1 = hide the photo there)
 
     // ----- You (the boat) -----
     playerSize:  46,
@@ -990,7 +990,7 @@
     if (BOATS[chosenBoat].draw === "sub") drawSub(size);
     else if (BOATS[chosenBoat].draw === "tube") drawTube(size);
     else drawEmoji(BOATS[chosenBoat].emoji, 0, 0, size);
-    if (save.olive) drawOlive(-size * 0.18, -size * 0.16, size * 0.46);   // 🐶 riding along
+    if (save.olive && chosenBoat !== "tube") drawOlive(-size * 0.18, -size * 0.16, size * 0.46);   // 🐶 rides along (but not on the tube — no room!)
     if (save.upgrades.crown) drawEmoji("👑", 0, -size * 0.46, size * 0.5);
     if (save.upgrades.flag)  drawEmoji("🚩", size * 0.34, -size * 0.34, size * 0.5);
     ctx.globalAlpha = 1;
@@ -1008,14 +1008,27 @@
     }
   }
   function drawTube(size) {
-    const rOut = size * 0.5, rIn = size * 0.24;
-    const g = ctx.createRadialGradient(-size * 0.12, -size * 0.12, rIn, 0, 0, rOut);
-    g.addColorStop(0, "#3c3c42"); g.addColorStop(1, "#1b1b1f");
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, rOut, 0, Math.PI * 2); ctx.fill();                          // black inflatable ring
-    ctx.fillStyle = "rgba(36,104,134,0.5)"; ctx.beginPath(); ctx.arc(0, 0, rIn, 0, Math.PI * 2); ctx.fill();      // watery center
-    ctx.strokeStyle = "rgba(255,255,255,0.22)"; ctx.lineWidth = size * 0.05;                                      // top sheen
-    ctx.beginPath(); ctx.arc(0, 0, (rOut + rIn) / 2, Math.PI * 1.05, Math.PI * 1.55); ctx.stroke();
-    ctx.fillStyle = "#4a4a52"; ctx.beginPath(); ctx.arc(rOut * 0.66, -rOut * 0.66, size * 0.06, 0, Math.PI * 2); ctx.fill();   // valve
+    const rOut = size * 0.52, rIn = size * 0.23, mid = (rOut + rIn) / 2, thick = rOut - rIn;
+    ctx.save();
+    // 3D inflatable ring — lit from the top (the hole stays open so the water shows through)
+    const g = ctx.createLinearGradient(0, -rOut, 0, rOut);
+    g.addColorStop(0, "#52525b"); g.addColorStop(0.45, "#2c2c33"); g.addColorStop(1, "#121214");
+    ctx.lineWidth = thick; ctx.strokeStyle = g;
+    ctx.beginPath(); ctx.arc(0, 0, mid, 0, Math.PI * 2); ctx.stroke();
+    // segment ridges (the puffy inflatable look)
+    ctx.strokeStyle = "rgba(0,0,0,0.28)"; ctx.lineWidth = Math.max(1, size * 0.02);
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 6) {
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * (rIn + 1), Math.sin(a) * (rIn + 1));
+      ctx.lineTo(Math.cos(a) * (rOut - 1), Math.sin(a) * (rOut - 1)); ctx.stroke();
+    }
+    // glossy highlight along the top of the ring
+    ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.lineWidth = thick * 0.3; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.arc(0, 0, mid, Math.PI * 1.12, Math.PI * 1.52); ctx.stroke();
+    // valve nub + a glint of water in the hole
+    ctx.fillStyle = "#5a5a63"; ctx.beginPath(); ctx.arc(Math.cos(-0.6) * mid, Math.sin(-0.6) * mid, size * 0.055, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.12)"; ctx.beginPath(); ctx.ellipse(-rIn * 0.3, -rIn * 0.35, rIn * 0.45, rIn * 0.22, -0.5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
   }
   function drawSub(size) {
     ctx.fillStyle = "#f2c230"; roundRect(-size * 0.5, -size * 0.22, size, size * 0.44, size * 0.2); ctx.fill();
