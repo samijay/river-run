@@ -129,7 +129,7 @@
     ol.board li.me { background: #1f8f6b; }
     ol.board li.me em, ol.board li.me b { color: #fff; }
 
-    .controls { display: flex; gap: 10px; width: min(94vw, 46dvh); justify-content: space-between; }
+    .controls { display: flex; flex-wrap: wrap; gap: 10px; width: min(94vw, 520px); justify-content: center; margin: 0 auto; }
     .cgroup { display: flex; gap: 8px; }
     .controls button {
       background: #14334c; color: #eaf4ff; border: 2px solid #2b5a80;
@@ -148,6 +148,9 @@
       h1 { font-size: 21px; }
       .byline { font-size: 11px; }
       p.hint, p.tweak { display: none; }
+      .controls { gap: 8px; }
+      .controls button { padding: 10px 13px; font-size: 15px; }
+      .dirbtn { min-width: 54px; padding: 10px 14px; }
     }
 
     /* ---- Cartoony E Brothers Gaming Corp. splash ---- */
@@ -384,7 +387,7 @@
   let celebrateT = 0, celebrateLevel = 0;   // the level-up celebration beat
   let wake = [];                            // foamy boat-wake trail
   let distance = 0;                         // meters traveled (the odometer)
-  let biomeIdx = 0, biomePrevIdx = 0, biomeFade = 0, biomeAnnounceT = 0;   // changing-lands crossfade + banner
+  let biomeIdx = 0, biomePrevIdx = 0, biomeFade = 0, biomeAnnounceT = 0, biomeNew = false;   // changing-lands crossfade + banner
 
   const player = {
     x: W / 2, y: H - 130, prevX: W / 2,
@@ -410,7 +413,7 @@
     const bl = Math.round((A & 255) + ((B & 255) - (A & 255)) * t);
     return `rgb(${r},${g},${bl})`; };
   const rgbaOf = (c, a) => c[0] === "#" ? hexA(c, a) : c.replace("rgb(", "rgba(").replace(")", "," + a + ")");
-  const biomeForLevel = (lvl) => Math.floor((lvl - 1) / BIOME_EVERY) % BIOMES.length;
+  const biomeForLevel = (lvl) => ((Math.floor((Math.max(1, lvl) - 1) / BIOME_EVERY) % BIOMES.length) + BIOMES.length) % BIOMES.length;
   const diff = () => DIFFICULTIES[save.difficulty] || DIFFICULTIES.normal;
   function comboMult() { return Math.min(1 + Math.floor(combo / 3), 5); }   // x1 .. x5 as the streak grows
   function circleHit(ax, ay, ar, bx, by, br) {
@@ -574,7 +577,7 @@
     level = 1; levelTime = 0; score = 0; distance = 0; checkpointLevel = 0; checkpointScore = 0;
     obstacles = []; coins = []; particles = []; floaters = []; wake = [];
     combo = 0; comboTimer = 0; freezeT = 0; flashT = 0;
-    biomeIdx = biomeForLevel(1); biomePrevIdx = biomeIdx; biomeFade = 0; biomeAnnounceT = 0;
+    biomeIdx = biomeForLevel(1); biomePrevIdx = biomeIdx; biomeFade = 0; biomeAnnounceT = 0; biomeNew = false;
     applyUpgradesToRun(); resetPlayerPos(); primeTimers();
     state = "play";
   }
@@ -583,7 +586,7 @@
     const completed = level;
     level++; levelTime = 0; obstacles = []; coins = [];
     const nb = biomeForLevel(level);
-    if (nb !== biomeIdx) { biomePrevIdx = biomeIdx; biomeIdx = nb; biomeFade = 1; biomeAnnounceT = 2.6; }   // entered a new land!
+    if (nb !== biomeIdx) { biomePrevIdx = biomeIdx; biomeIdx = nb; biomeFade = 1; biomeNew = true; }   // entered a new land! (announced on resume)
     newlyUnlocked = null;
     for (const key in BOATS)
       if (BOATS[key].unlockLevel === level && !save.ownedBoats.includes(key)) { save.ownedBoats.push(key); newlyUnlocked = key; }
@@ -601,6 +604,7 @@
 
   function resumeNextLevel() {
     if (save.upgrades.shield) player.shield = true;   // a fresh shield each level
+    if (biomeNew) { biomeAnnounceT = 2.6; biomeFade = 1; biomeNew = false; }   // reveal the new land now you're back on the river
     resetPlayerPos(); primeTimers(); hideOverlay(); state = "play";
   }
 
@@ -619,7 +623,7 @@
     level = checkpointLevel; score = checkpointScore; levelTime = 0;
     obstacles = []; coins = []; particles = []; floaters = []; wake = [];
     combo = 0; comboTimer = 0; freezeT = 0; flashT = 0;
-    biomeIdx = biomeForLevel(level); biomePrevIdx = biomeIdx; biomeFade = 0; biomeAnnounceT = 0;
+    biomeIdx = biomeForLevel(level); biomePrevIdx = biomeIdx; biomeFade = 0; biomeAnnounceT = 0; biomeNew = false;
     applyUpgradesToRun(); resetPlayerPos(); primeTimers(); hideOverlay(); state = "play";
   }
 
@@ -725,7 +729,7 @@
     if (flashT > 0) flashT -= sec;
     if (biomeFade > 0) biomeFade = Math.max(0, biomeFade - sec / 1.2);   // ~1.2s crossfade into a new land
     if (biomeAnnounceT > 0) biomeAnnounceT -= sec;
-    if (comboTimer > 0) { comboTimer -= sec; if (comboTimer <= 0) combo = 0; }
+    if (state === "play" && comboTimer > 0) { comboTimer -= sec; if (comboTimer <= 0) combo = 0; }   // streak holds while paused
 
     if (state === "celebrate") {
       celebrateT -= sec; waterScroll += 2.2 * dt;
@@ -1062,7 +1066,7 @@
       const x = rand(CH_L, CH_R - 40);
       ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 30, y - 4); ctx.stroke();
     }
-    ctx.fillStyle = "#fff"; ctx.font = "bold 22px " + UI_FONT; ctx.textAlign = "center";
+    ctx.fillStyle = "#fff"; ctx.font = "bold 22px " + UI_FONT; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.globalAlpha = 0.6 + 0.4 * Math.abs(Math.sin(gameClock * 6));
     ctx.fillText("🌊 RAPIDS! 🌊", W / 2, 92); ctx.globalAlpha = 1;
   }

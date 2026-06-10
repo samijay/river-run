@@ -1,7 +1,7 @@
 // River Run — service worker (makes the game installable + playable offline).
 // Strategy: network-FIRST for the page itself (so an online player always gets the
 // latest version), cache-first for static assets, and the leaderboard API is never cached.
-const CACHE = "river-run-v2";
+const CACHE = "river-run-v2-2";   // bump this string on every deploy so caches refresh for testers
 const ASSETS = ["./", "./index.html", "./assets/river-bg.jpg", "./assets/icon-192.png", "./assets/icon-512.png", "./manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {
