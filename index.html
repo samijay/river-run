@@ -561,7 +561,7 @@
   function continueFromCheckpoint() {
     level = checkpointLevel; score = checkpointScore; levelTime = 0;
     obstacles = []; coins = []; particles = []; floaters = []; wake = [];
-    combo = 0; comboTimer = 0;
+    combo = 0; comboTimer = 0; freezeT = 0; flashT = 0;
     applyUpgradesToRun(); resetPlayerPos(); primeTimers(); hideOverlay(); state = "play";
   }
 
@@ -635,6 +635,7 @@
     const el = document.getElementById(id);
     el.addEventListener("pointerdown", (e) => {
       e.preventDefault(); ensureAudio();
+      if (state !== "play") return;                      // ◀ ▶ only steer during play (match keyboard/jump/pointer)
       keys[key] = true; usePointer = false; heldBy[key] = e.pointerId; el.classList.add("held");
       try { el.setPointerCapture(e.pointerId); } catch (err) {}
     });
@@ -751,7 +752,7 @@
         obstacles.splice(i, 1); damage(); continue;
       }
       // near-miss: it slipped just past you — reward the dodge and feed the combo
-      if (!o.grazed && !avoided && o.y > player.y && Math.abs(o.x - player.x) < (pr + o.type.r) * 1.7) {
+      if (!o.grazed && invincT <= 0 && !avoided && o.y > player.y && Math.abs(o.x - player.x) < (pr + o.type.r) * 1.7) {
         o.grazed = true; combo++; comboTimer = settings.comboWindow;
         const pts = 5 * comboMult();
         score += pts; floatText(o.x, o.y - 12, "✨ +" + pts, "#ffffff");
@@ -774,7 +775,7 @@
         score += pts; save.wallet += c.coins * m;
         floatText(c.x, c.y, "+" + pts + (m > 1 ? " x" + m : ""), c.gem ? "#9fe8ff" : "#ffe27a");
         burst(c.x, c.y, c.gem ? "#9fe8ff" : "#ffe27a", c.gem ? 16 : 10);
-        if (c.gem) { sGem(); freezeT = Math.max(freezeT, 0.035); } else sCoinCombo(combo);
+        if (c.gem) sGem(); else sCoinCombo(combo);   // gems pop via sound + burst + bright text (no per-gem freeze → no late-level stutter)
         buzz(c.gem ? 25 : 12);
         if (save.olive && Math.random() < 0.25) sBark();   // Olive cheers you on 🐶
       }
@@ -838,8 +839,10 @@
     g.addColorStop(0, "rgba(255,255,255,0.6)"); g.addColorStop(1, "rgba(255,255,255,0)");
     bx.fillStyle = g; bx.beginPath(); bx.arc(32, 32, 32, 0, Math.PI * 2); bx.fill();
   })();
+  const LOWFX = (window.devicePixelRatio || 1) < 1.5;          // weaker / older devices → lighter water effects
+  const BLOB_N = LOWFX ? 11 : 22, RIPPLE_N = LOWFX ? 8 : 16;
   const waterBlobs = [];
-  for (let i = 0; i < 22; i++) waterBlobs.push({ x: rand(CH_L, CH_R), y: rand(0, H), s: rand(0.5, 1.4), phase: rand(0, 6.28), spd: rand(0.5, 1.0) });
+  for (let i = 0; i < BLOB_N; i++) waterBlobs.push({ x: rand(CH_L, CH_R), y: rand(0, H), s: rand(0.5, 1.4), phase: rand(0, 6.28), spd: rand(0.5, 1.0) });
 
   function drawWake() {
     ctx.fillStyle = "#eaf6ff";
@@ -891,29 +894,32 @@
     }
 
     // Living water: faint ripple lines + drifting caustic shimmer + a slow moving sun-glint.
-    ctx.save(); ctx.beginPath(); ctx.rect(CH_L, 0, CH_R - CH_L, H); ctx.clip();
-    ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.lineWidth = 2;
-    for (let i = 0; i < 16; i++) {
-      const y = ((i * 50 + waterScroll) % (H + 50)) - 25;
-      ctx.beginPath();
-      for (let x = CH_L; x <= CH_R; x += 22) {
-        const yy = y + Math.sin((x + waterScroll) * 0.03) * 3;
-        x === CH_L ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy);
+    // Only while actually playing — don't pay for it under the menus or during a hit-stop freeze.
+    if ((state === "play" || state === "celebrate") && freezeT <= 0) {
+      ctx.save(); ctx.beginPath(); ctx.rect(CH_L, 0, CH_R - CH_L, H); ctx.clip();
+      ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.lineWidth = 2;
+      for (let i = 0; i < RIPPLE_N; i++) {
+        const y = ((i * (800 / RIPPLE_N) + waterScroll) % (H + 50)) - 25;
+        ctx.beginPath();
+        for (let x = CH_L; x <= CH_R; x += 22) {
+          const yy = y + Math.sin((x + waterScroll) * 0.03) * 3;
+          x === CH_L ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy);
+        }
+        ctx.stroke();
       }
-      ctx.stroke();
+      for (const b of waterBlobs) {                                   // shimmering caustics (cached sprite)
+        const y = ((b.y + waterScroll * b.spd) % (H + 80)) - 40;
+        ctx.globalAlpha = 0.05 + 0.06 * Math.abs(Math.sin(gameClock * 1.4 + b.phase));
+        const sz = 70 * b.s;
+        ctx.drawImage(blobCanvas, b.x - sz / 2, y - sz / 2, sz, sz);
+      }
+      ctx.globalAlpha = 1;
+      const gx = CH_L + (CH_R - CH_L) * (0.5 + 0.42 * Math.sin(gameClock * 0.28));   // slow sun-glint band
+      const gg = ctx.createLinearGradient(gx - 46, 0, gx + 46, 0);
+      gg.addColorStop(0, "rgba(255,255,255,0)"); gg.addColorStop(0.5, "rgba(255,255,255,0.1)"); gg.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = gg; ctx.fillRect(gx - 46, 0, 92, H);
+      ctx.restore();
     }
-    for (const b of waterBlobs) {                                   // shimmering caustics (cached sprite)
-      const y = ((b.y + waterScroll * b.spd) % (H + 80)) - 40;
-      ctx.globalAlpha = 0.05 + 0.06 * Math.abs(Math.sin(gameClock * 1.4 + b.phase));
-      const sz = 70 * b.s;
-      ctx.drawImage(blobCanvas, b.x - sz / 2, y - sz / 2, sz, sz);
-    }
-    ctx.globalAlpha = 1;
-    const gx = CH_L + (CH_R - CH_L) * (0.5 + 0.42 * Math.sin(gameClock * 0.28));   // slow sun-glint band
-    const gg = ctx.createLinearGradient(gx - 46, 0, gx + 46, 0);
-    gg.addColorStop(0, "rgba(255,255,255,0)"); gg.addColorStop(0.5, "rgba(255,255,255,0.1)"); gg.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = gg; ctx.fillRect(gx - 46, 0, 92, H);
-    ctx.restore();
 
     if (!bgReady) paintForestEdges();         // sandy shore + scrolling pine trees
   }
