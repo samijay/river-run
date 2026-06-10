@@ -8,6 +8,8 @@ start showing up.
 Built to be **easy to change** so the nephews can learn by tinkering. The whole game is one
 file (`index.html`) with friendly comments and a clearly-marked **TWEAK ZONE**.
 
+**▶ Play it online:** https://river-run-lyart.vercel.app
+
 ---
 
 ## ▶️ How to play
@@ -24,7 +26,7 @@ file (`index.html`) with friendly comments and a clearly-marked **TWEAK ZONE**.
 | Sound on/off | **M** | the **🔊** button |
 
 **Goal:** earn points by surviving and catching coins. You have **3 lives** (❤️ at the top).
-Each level lasts about **35 seconds** — survive it and you advance. The gold bar across the
+Each level lasts about **30 seconds** — survive it and you advance. The gold bar across the
 very top shows how close you are to the next level.
 
 ---
@@ -33,17 +35,22 @@ very top shows how close you are to the next level.
 
 | Level | What appears |
 |---|---|
-| 1 | A few **rocks** 🪨 + coins 🪙 — learn to steer and jump |
-| 2 | **Logs** 🪵 and **sticks**, plus "rock walls" with a gap to thread |
-| 3 | **Jumping fish** 🐟 that weave (you can't jump over these!) + **gems** 💎 worth more |
+| 1 | A few **rocks** 🪨 + **gold coins** 🪙 — learn to steer and jump |
+| 2 | **Brown logs & sticks**, plus "rock walls" with a gap to thread |
+| 3 | **Red / yellow / green fish** that weave (can't jump these!) + **blue gems** 💎 worth 50 |
 | 4+ | **Fisherman boats** 🚣 that drift side to side, faster water, more coins |
+| 5, 10, 15… | **Rapids** speed the river up — and every 5th level is a **checkpoint** |
+| 10+ | **Submerged whirlpools** lurk underwater — steer around them |
 
-> 💡 **Jumping** lets you pass over rocks, logs, and sticks — but **not** fish or boats.
-> Those you have to steer around.
+> 💡 **Jumping** clears rocks, logs, and sticks — but **not** fish, boats, or whirlpools.
+> The **Submarine** is special: it **dives** (Space) to slip under everything on the surface.
 
-After you finish **Level 1**, the game asks if you'd like to add a **name to the leaderboard**
-(totally optional). Top scores are saved on your computer and shown on the start screen.
-New boats — **⛵ Sailboat** (Level 2) and **🚤 Speedboat** (Level 3) — unlock as you progress.
+**Leaderboard:** after Level 1 (and at Game Over) the game always asks **who's playing** —
+keep the name or type a new one, so siblings can take turns. Top scores save on your computer.
+
+**Boats unlock every 3 levels:** ⛵ Sailboat (Lv 3), 🚤 Speedboat (Lv 6), 🤿 Submarine (Lv 9).
+Between levels, tap **🛟 Dock & Shop** to switch to any boat you own, or spend coins on upgrades
+(Racing Flag, Golden Crown, Coin Magnet, Bumper Shield, Speed Tune, Extra Heart).
 
 ---
 
@@ -73,11 +80,11 @@ New boats — **⛵ Sailboat** (Level 2) and **🚤 Speedboat** (Level 3) — un
 
 The code is split into labeled `SECTION` comments to help you find things:
 
-- **Shield power-up** — a special item that protects you for a few seconds.
-- **A coin shop** — spend collected coins to buy the sailboat/speedboat/submarine.
-- **Rapids** — a stretch where the river pushes your boat sideways.
 - **A bridge or waterfall** — a mini event between levels.
 - **Day/night** — change the water colors as the levels go up.
+- **Combo bonus** — extra points for grabbing coins without getting hit.
+- **More boats** — add one to the `BOATS` list with an `unlockLevel` of 12, 15, …
+- **Your own backdrop** — drop a picture at `assets/river-bg.png` (see that folder's note).
 
 ---
 
@@ -85,7 +92,7 @@ The code is split into labeled `SECTION` comments to help you find things:
 
 - **Plain HTML, CSS, and JavaScript** — no frameworks, no build step, nothing to install.
 - It draws on an **HTML `<canvas>`** (a digital sketchpad the code paints ~60 times a second).
-- Boats, coins, and most obstacles are just **emoji** drawn as text — so there are no image files.
+- The art is drawn by code (coins, gems, logs, fish, the forest, the boats) plus a few **emoji** — no image files needed.
 - Sounds are generated live by the browser's **Web Audio**, so there are no sound files either.
 
 Have fun out there! 🛶⭐
