@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>River Run</title>
+
+  <!--
+    ============================================================
+      🛶  RIVER RUN  🛶   — a tiny river-boat game
+    ============================================================
+    HOW TO PLAY: double-click index.html. To CHANGE the game,
+    open this file in a text editor, find the "TWEAK ZONE"
+    below, change a number, save, and refresh the browser.
+    ============================================================
+  -->
+
+  <style>
+    html, body {
+      margin: 0; height: 100%;
+      background: #07131f; color: #e8f3ff;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    body {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 12px; padding: 16px; box-sizing: border-box; text-align: center;
+    }
+    h1 { margin: 0; font-size: 26px; letter-spacing: 1px; }
+
+    #stage { position: relative; width: 100%; max-width: 460px; }
+    canvas {
+      display: block; width: 100%; height: auto;
+      background: #1c6699; border-radius: 16px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.55); touch-action: none;
+    }
+
+    #overlay {
+      position: absolute; inset: 0; display: none;
+      align-items: center; justify-content: center;
+      background: rgba(5,14,24,0.6); border-radius: 16px; padding: 12px; box-sizing: border-box;
+    }
+    .panel {
+      background: #0e2233; border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 16px; padding: 16px; width: 100%; max-width: 390px;
+      max-height: 100%; overflow-y: auto;
+    }
+    .panel h2 { margin: 0 0 6px; font-size: 23px; }
+    .panel h3 { margin: 14px 0 6px; font-size: 14px; color: #9fd0ff; text-transform: uppercase; letter-spacing: .5px; }
+    .panel p { margin: 6px 0; font-size: 14px; color: #c5dcf0; }
+    .muted { color: #7f9bb5; }
+
+    .boats { display: flex; gap: 10px; justify-content: center; margin: 10px 0; }
+    .boat-btn {
+      flex: 1; background: #14334c; color: #eaf4ff; border: 2px solid #2b5a80;
+      border-radius: 14px; padding: 12px 8px; font-size: 15px; font-weight: 700; cursor: pointer;
+      display: flex; flex-direction: column; gap: 6px; align-items: center;
+    }
+    .boat-btn span { font-size: 36px; }
+    .boat-btn:hover { border-color: #5fb0ff; background: #1a466a; }
+
+    button.primary, #again, #continueBtn, #dockDone {
+      background: #1f8f6b; color: #fff; border: none; border-radius: 12px;
+      padding: 11px 16px; font-size: 15px; font-weight: 700; cursor: pointer;
+    }
+    button.primary:hover, #again:hover, #continueBtn:hover, #dockDone:hover { background: #25a87e; }
+    .secondary { background: #2b5a80; color: #fff; border: none; border-radius: 12px; padding: 11px 16px; font-size: 14px; font-weight: 700; cursor: pointer; }
+    .secondary:hover { background: #356d9c; }
+
+    .row { display: flex; gap: 8px; justify-content: center; margin: 8px 0; flex-wrap: wrap; }
+    .row input {
+      flex: 1; min-width: 120px; padding: 11px 12px; border-radius: 12px;
+      border: 2px solid #2b5a80; background: #0a1b29; color: #fff; font-size: 15px;
+    }
+    .how { font-size: 13px; color: #9fd0ff; margin-top: 10px; line-height: 1.6; }
+
+    /* Dock grids (boats + shop) */
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .boat-tile, .shop-item {
+      background: #14334c; border: 2px solid #2b5a80; border-radius: 12px;
+      padding: 10px 6px; font-size: 13px; font-weight: 700; color: #eaf4ff;
+      display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer;
+    }
+    .boat-tile span { font-size: 30px; }
+    .boat-tile.sel { border-color: #2fd29a; background: #16513c; }
+    .boat-tile.locked, .shop-item.owned { opacity: 0.6; cursor: default; border-style: dashed; }
+    .boat-tile em { color: #7f9bb5; font-style: normal; font-size: 11px; }
+    .shop-item { flex-direction: row; justify-content: space-between; padding: 11px 12px; }
+    .shop-item b { color: #ffd76a; }
+    .shop-item.owned b { color: #2fd29a; }
+    .shop-item:disabled, .shop-item.cant { opacity: 0.45; cursor: default; }
+
+    ol.board { list-style: none; margin: 6px 0 0; padding: 0; }
+    ol.board li {
+      display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+      border-radius: 8px; font-size: 14px; background: #102a3f; margin-bottom: 4px;
+    }
+    ol.board li span { flex: 1; text-align: left; }
+    ol.board li b { color: #ffd76a; }
+    ol.board li em { color: #7f9bb5; font-style: normal; font-size: 12px; }
+    ol.board li.me { background: #1f8f6b; }
+    ol.board li.me em, ol.board li.me b { color: #fff; }
+
+    .controls { display: flex; gap: 10px; }
+    .controls button {
+      background: #14334c; color: #eaf4ff; border: 2px solid #2b5a80;
+      border-radius: 12px; padding: 10px 16px; font-size: 15px; font-weight: 700; cursor: pointer;
+    }
+    .controls button:active { background: #1a466a; }
+    p.hint { margin: 0; max-width: 460px; font-size: 13px; color: #9fb6cc; line-height: 1.5; }
+    p.tweak { margin: 0; max-width: 460px; font-size: 12px; color: #7f96ad;
+      background: #0e2233; padding: 9px 13px; border-radius: 10px; }
+    b.k { color: #ffd76a; }
+  </style>
+</head>
+<body>
+  <h1>🛶 River Run</h1>
+
+  <div id="stage">
+    <canvas id="game" width="460" height="720"></canvas>
+    <div id="overlay"></div>
+  </div>
+
+  <div class="controls">
+    <button id="muteBtn" title="Sound on/off">🔊</button>
+    <button id="jumpBtn" title="Jump / Dive">⤴ Jump</button>
+  </div>
+
+  <p class="hint">
+    Steer with the <b class="k">arrow keys</b> (or mouse / finger). <b class="k">Space</b> = jump
+    (the Submarine dives!). Grab coins 🪙, dodge the rocks — survive to level up!
+  </p>
+  <p class="tweak">
+    👾 Want to change the game? Open <b class="k">index.html</b> in a text editor and find the
+    <b class="k">TWEAK ZONE</b> near the top. Change a number, save, refresh!
+  </p>
+
+  <script>
+  /* ============================================================
+     SECTION 0 — Canvas setup
+     ============================================================ */
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  const overlay = document.getElementById("overlay");
+  const EMOJI_FONT = "'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif";
+  const UI_FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+
+  // OPTIONAL backdrop: drop a picture at assets/river-bg.png and it's used automatically.
+  // If it's missing, the game paints its own forest river. Either way the river stays STRAIGHT.
+  const bgImage = new Image(); let bgReady = false;
+  bgImage.onload = () => { bgReady = true; };
+  bgImage.onerror = () => { bgReady = false; };
+  bgImage.src = "assets/river-bg.png";
+
+
+  /* ============================================================
+     🎮  TWEAK ZONE  🎮  — change these and refresh!
+     ============================================================ */
+  const settings = {
+    // ----- River colors (brighter = easier to see) -----
+    waterTop:    "#49a9c0",     // teal "shallows" near the banks
+    waterBottom: "#1d6699",     // deep blue in the middle
+    bankColor:   "#2f7d44",     // forest green banks
+
+    // ----- You (the boat) -----
+    playerSize:  46,
+    playerSpeed: 5.5,
+
+    // ----- Jump / dive -----
+    jumpLift:     30,
+    jumpDuration: 0.55,
+    jumpCooldown: 0.25,
+
+    // ----- Difficulty / levels -----
+    levelDuration:   30,        // seconds per level before leveling up
+    baseScroll:      3.0,
+    scrollPerLevel:  0.5,
+    maxScroll:       8.5,
+    baseObstacleEvery: 1.5,
+    minObstacleEvery:  0.45,
+    baseCoinEvery:     1.5,
+    minCoinEvery:      0.7,
+
+    // ----- Points & coins (coins = your shop budget) -----
+    scorePerSecond: 5,
+    coinScore: 10,  coinCoins: 1,   // a gold coin
+    gemScore:  50,  gemCoins:  5,   // a blue gem
+    lives: 3,
+
+    // ----- Rapids (faster water in later levels) -----
+    rapidsFromLevel: 5,
+    rapidsEveryMin: 12, rapidsEveryMax: 20,
+    rapidsDuration: 5, rapidsMultiplier: 1.7,
+
+    // ----- Special level rules -----
+    checkpointEvery: 5,         // a checkpoint every 5 levels
+    submergeFromLevel: 10,      // underwater hazards start here
+
+    soundOn: true,
+  };
+
+  // Boats unlock every 3 levels. handling = how nimble. canDive = it's a submarine.
+  const BOATS = {
+    canoe:     { emoji: "🛶", name: "Canoe",      handling: 1.0,  unlockLevel: 1 },
+    tube:      { emoji: "🛟", name: "Lazy Tube",  handling: 0.85, unlockLevel: 1 },
+    sailboat:  { emoji: "⛵", name: "Sailboat",   handling: 1.15, unlockLevel: 3 },
+    speedboat: { emoji: "🚤", name: "Speedboat",  handling: 1.35, unlockLevel: 6 },
+    submarine: { emoji: "🤿", name: "Submarine",  handling: 1.2,  unlockLevel: 9, canDive: true, draw: "sub" },
+  };
+
+  // River hazards. jumpable = hop over it. submerged = it's underwater (steer around).
+  const OBSTACLES = [
+    { key: "rock",  emoji: "🪨",    size: 40, r: 18, jumpable: true,  drift: null,   minLevel: 1,  weight: 5 },
+    { key: "log",   draw: "log",   size: 58, r: 24, jumpable: true,  drift: null,   minLevel: 2,  weight: 3 },
+    { key: "stick", draw: "stick", size: 36, r: 11, jumpable: true,  drift: null,   minLevel: 2,  weight: 2 },
+    { key: "fish",  draw: "fish",  size: 30, r: 14, jumpable: false, drift: "dart", minLevel: 3,  weight: 3 },
+    { key: "boat",  emoji: "🚣",    size: 50, r: 22, jumpable: false, drift: "sway", minLevel: 4,  weight: 2 },
+    { key: "whirl", draw: "whirl", size: 48, r: 20, jumpable: false, drift: "sway", minLevel: 10, weight: 3, submerged: true },
+  ];
+  const FISH_COLORS = ["#e0473a", "#f2c230", "#4caf50"];   // red, yellow, green
+
+  // Things to buy with coins. "Look" = aesthetic, "Power" = performance.
+  const UPGRADES = {
+    flag:      { name: "Racing Flag 🚩",  cost: 15, kind: "Look" },
+    crown:     { name: "Golden Crown 👑", cost: 45, kind: "Look" },
+    magnet:    { name: "Coin Magnet 🧲",  cost: 30, kind: "Power" },
+    shield:    { name: "Bumper Shield 🛡️", cost: 50, kind: "Power" },
+    speedTune: { name: "Speed Tune ⚡",   cost: 35, kind: "Power" },
+    extraLife: { name: "Extra Heart ❤️",  cost: 60, kind: "Power" },
+  };
+  /* ===================  END OF TWEAK ZONE  =================== */
+
+
+  /* ============================================================
+     SECTION 1 — Saved progress (boats you own, your coin budget, upgrades)
+     ============================================================ */
+  function loadSave() {
+    let s = null;
+    try { s = JSON.parse(localStorage.getItem("riverRunSave")); } catch (e) {}
+    if (!s || typeof s !== "object") s = {};
+    return {
+      ownedBoats: Array.isArray(s.ownedBoats) ? s.ownedBoats : ["canoe", "tube"],
+      wallet: typeof s.wallet === "number" ? s.wallet : 0,
+      upgrades: (s.upgrades && typeof s.upgrades === "object") ? s.upgrades : {},
+      chosenBoat: typeof s.chosenBoat === "string" ? s.chosenBoat : "canoe",
+      lastName: typeof s.lastName === "string" ? s.lastName : "",
+    };
+  }
+  function persist() { try { localStorage.setItem("riverRunSave", JSON.stringify(save)); } catch (e) {} }
+  // Remember the last name only to PRE-FILL the box — we still always ask who's playing.
+  function rememberName(v) { playerName = v; save.lastName = v; persist(); }
+
+  const save = loadSave();
+  if (!save.ownedBoats.includes("canoe")) save.ownedBoats.push("canoe");
+  if (!save.ownedBoats.includes("tube"))  save.ownedBoats.push("tube");
+  let chosenBoat = save.ownedBoats.includes(save.chosenBoat) ? save.chosenBoat : "canoe";
+
+
+  /* ============================================================
+     SECTION 2 — Game state
+     ============================================================ */
+  const BANK = 48, CH_L = BANK, CH_R = W - BANK;
+
+  let state = "select";          // select | play | levelComplete | dock | over
+  let dockFrom = "select";
+  let level = 1, levelTime = 0, score = 0, lives = settings.lives;
+  let playerName = null, newlyUnlocked = null;
+  let checkpointLevel = 0, checkpointScore = 0;
+
+  let obstacles = [], coins = [], particles = [], floaters = [];
+  let obstacleTimer = 0, coinTimer = 0, invincT = 0, shakeT = 0;
+  let rapidsT = 0, rapidsCD = 0;
+  let waterScroll = 0, gameClock = 0;
+
+  const player = {
+    x: W / 2, y: H - 130, prevX: W / 2,
+    tilt: 0, special: 0, cd: 0, hop: 0, sink: 0, airborne: false, shield: false,
+  };
+  let jumpQueued = false;
+  const keys = { left: false, right: false, up: false, down: false };
+  let usePointer = false, paddleTimer = 0;
+
+
+  /* ============================================================
+     SECTION 3 — Helpers
+     ============================================================ */
+  const rand = (a, b) => Math.random() * (b - a) + a;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const pick = (list) => list[Math.floor(Math.random() * list.length)];
+  function circleHit(ax, ay, ar, bx, by, br) {
+    const dx = ax - bx, dy = ay - by; return dx * dx + dy * dy < (ar + br) * (ar + br);
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+  function pickObstacle(types) {
+    let total = 0; for (const t of types) total += t.weight;
+    let roll = Math.random() * total;
+    for (const t of types) { roll -= t.weight; if (roll <= 0) return t; }
+    return types[0];
+  }
+
+
+  /* ============================================================
+     SECTION 4 — Sound (made by the browser, no files)
+     ============================================================ */
+  let audioCtx = null, masterGain = null, noiseBuffer = null, muted = false;
+  function ensureAudio() {
+    if (!settings.soundOn) return;
+    if (audioCtx) { if (audioCtx.state === "suspended") audioCtx.resume(); return; }
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain = audioCtx.createGain(); masterGain.gain.value = muted ? 0 : 1;
+      masterGain.connect(audioCtx.destination);
+      const len = Math.floor(audioCtx.sampleRate * 1.5);
+      noiseBuffer = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+      const d = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      startAmbient();
+    } catch (e) { audioCtx = null; }
+  }
+  function startAmbient() {
+    if (!audioCtx) return;
+    const src = audioCtx.createBufferSource(); src.buffer = noiseBuffer; src.loop = true;
+    const lp = audioCtx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 500;
+    const g = audioCtx.createGain(); g.gain.value = 0.02;
+    const lfo = audioCtx.createOscillator(); lfo.frequency.value = 0.28;
+    const lfoGain = audioCtx.createGain(); lfoGain.gain.value = 0.012;
+    lfo.connect(lfoGain); lfoGain.connect(g.gain);
+    src.connect(lp); lp.connect(g); g.connect(masterGain); src.start(); lfo.start();
+  }
+  function noiseBurst(dur, freq, vol) {
+    if (!audioCtx) return;
+    const src = audioCtx.createBufferSource(); src.buffer = noiseBuffer;
+    const f = audioCtx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = freq;
+    const g = audioCtx.createGain(); const t = audioCtx.currentTime;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(masterGain); src.start(t); src.stop(t + dur);
+  }
+  function tone(freq, dur, type, vol, delay) {
+    if (!audioCtx) return;
+    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+    o.type = type || "sine"; o.frequency.value = freq;
+    const t = audioCtx.currentTime + (delay || 0);
+    g.gain.setValueAtTime(vol || 0.05, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(masterGain); o.start(t); o.stop(t + dur);
+  }
+  const sPaddle = () => noiseBurst(0.12, 700, 0.05);
+  const sJump   = () => { noiseBurst(0.18, 950, 0.06); tone(320, 0.18, "sine", 0.05); };
+  const sDive   = () => { noiseBurst(0.25, 400, 0.07); tone(180, 0.25, "sine", 0.05); };
+  const sSplash = () => { noiseBurst(0.32, 600, 0.10); tone(140, 0.26, "triangle", 0.06); };
+  const sCoin   = () => { tone(880, 0.10, "sine", 0.05); tone(1320, 0.09, "sine", 0.05, 0.06); };
+  const sGem    = () => [660, 990, 1320].forEach((f, i) => tone(f, 0.12, "triangle", 0.05, i * 0.06));
+  const sLevel  = () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.2, "square", 0.045, i * 0.09));
+  const sShield = () => { tone(700, 0.12, "square", 0.05); tone(500, 0.16, "square", 0.05, 0.05); };
+  const sBuy    = () => { tone(880, 0.1, "triangle", 0.06); tone(1175, 0.12, "triangle", 0.06, 0.07); };
+  const sRapids = () => noiseBurst(0.6, 900, 0.07);
+  function toggleMute() {
+    muted = !muted; if (masterGain) masterGain.gain.value = muted ? 0 : 1;
+    document.getElementById("muteBtn").textContent = muted ? "🔇" : "🔊";
+  }
+
+
+  /* ============================================================
+     SECTION 5 — Sparkles & "+points" popups
+     ============================================================ */
+  function burst(x, y, color, n) {
+    for (let i = 0; i < n; i++)
+      particles.push({ x, y, vx: rand(-3, 3), vy: rand(-4, 1), life: rand(0.4, 0.8), max: 0.8, size: rand(2, 5), color });
+  }
+  function floatText(x, y, text, color) { floaters.push({ x, y, text, color, life: 1 }); }
+
+
+  /* ============================================================
+     SECTION 6 — Difficulty per level
+     ============================================================ */
+  function levelParams(lvl) {
+    return {
+      scroll: Math.min(settings.baseScroll + (lvl - 1) * settings.scrollPerLevel, settings.maxScroll),
+      obstacleEvery: Math.max(settings.minObstacleEvery, settings.baseObstacleEvery - (lvl - 1) * 0.14),
+      coinEvery: Math.max(settings.minCoinEvery, settings.baseCoinEvery - (lvl - 1) * 0.09),
+      types: OBSTACLES.filter(t => lvl >= t.minLevel),
+      gemChance: lvl >= 3 ? Math.min(0.12 + (lvl - 3) * 0.05, 0.45) : 0,
+      patternChance: lvl >= 2 ? Math.min(0.15 + (lvl - 2) * 0.05, 0.4) : 0,
+    };
+  }
+
+
+  /* ============================================================
+     SECTION 7 — Spawning
+     ============================================================ */
+  function addObstacle(type, x) {
+    obstacles.push({
+      type, x, baseX: x, y: -type.size, phase: rand(0, 1000),
+      speedMul: type.key === "boat" ? 0.85 : 1,
+      color: type.key === "fish" ? pick(FISH_COLORS) : null,
+    });
+  }
+  function spawnObstacleEvent(p) {
+    if (Math.random() < p.patternChance) {
+      const gap = rand(CH_L + 60, CH_R - 60);
+      for (let x = CH_L + 24; x <= CH_R - 24; x += 46) {
+        if (Math.abs(x - gap) < 60) continue;
+        addObstacle(OBSTACLES[0], x);
+      }
+    } else {
+      const type = pickObstacle(p.types);
+      addObstacle(type, rand(CH_L + type.size * 0.5, CH_R - type.size * 0.5));
+    }
+  }
+  function spawnCoin(p) {
+    const isGem = Math.random() < p.gemChance;
+    coins.push({
+      x: rand(CH_L + 22, CH_R - 22), y: -30, size: 30, r: 15, phase: rand(0, 1000), gem: isGem,
+      value: isGem ? settings.gemScore : settings.coinScore,
+      coins: isGem ? settings.gemCoins : settings.coinCoins,
+    });
+  }
+
+
+  /* ============================================================
+     SECTION 8 — Start / level-up / damage / checkpoints
+     ============================================================ */
+  function applyUpgradesToRun() {
+    lives = settings.lives + (save.upgrades.extraLife ? 1 : 0);
+    player.shield = !!save.upgrades.shield;
+  }
+  function primeTimers() {
+    const p = levelParams(level);
+    obstacleTimer = p.obstacleEvery; coinTimer = p.coinEvery;
+    rapidsT = 0; rapidsCD = rand(settings.rapidsEveryMin, settings.rapidsEveryMax);
+  }
+  function resetPlayerPos() {
+    player.x = W / 2; player.y = H - 130; player.prevX = W / 2;
+    player.tilt = 0; player.special = 0; player.cd = 0; player.hop = 0; player.sink = 0; player.airborne = false;
+    invincT = 0; shakeT = 0; jumpQueued = false; usePointer = false;
+  }
+
+  function startGame() {
+    level = 1; levelTime = 0; score = 0; checkpointLevel = 0; checkpointScore = 0;
+    obstacles = []; coins = []; particles = []; floaters = [];
+    applyUpgradesToRun(); resetPlayerPos(); primeTimers();
+    state = "play";
+  }
+
+  function completeLevel() {
+    const completed = level;
+    level++; levelTime = 0; obstacles = []; coins = [];
+    newlyUnlocked = null;
+    for (const key in BOATS)
+      if (BOATS[key].unlockLevel === level && !save.ownedBoats.includes(key)) { save.ownedBoats.push(key); newlyUnlocked = key; }
+    if (level % settings.checkpointEvery === 0) { checkpointLevel = level; checkpointScore = Math.floor(score); }
+    persist();
+    state = "levelComplete"; sLevel(); showLevelComplete(completed);
+  }
+
+  function resumeNextLevel() {
+    if (save.upgrades.shield) player.shield = true;   // a fresh shield each level
+    resetPlayerPos(); primeTimers(); hideOverlay(); state = "play";
+  }
+
+  function continueFromCheckpoint() {
+    level = checkpointLevel; score = checkpointScore; levelTime = 0;
+    obstacles = []; coins = []; particles = []; floaters = [];
+    applyUpgradesToRun(); resetPlayerPos(); primeTimers(); hideOverlay(); state = "play";
+  }
+
+  function damage() {
+    if (player.shield) { player.shield = false; invincT = 1.0; burst(player.x, player.y, "#9fe8ff", 18); sShield(); return; }
+    lives--; burst(player.x, player.y, "#ff7a7a", 16); shakeT = 0.35; invincT = 1.2; sSplash();
+    if (lives <= 0) { state = "over"; persist(); showGameOver(); }
+  }
+
+
+  /* ============================================================
+     SECTION 9 — Controls
+     ============================================================ */
+  window.addEventListener("keydown", (e) => {
+    if (e.target && e.target.tagName === "INPUT") return;
+    if (state !== "play") return;
+    const k = e.key;
+    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(k)) e.preventDefault();
+    if (k === "ArrowLeft" || k === "a" || k === "A") { keys.left = true; usePointer = false; }
+    if (k === "ArrowRight" || k === "d" || k === "D") { keys.right = true; usePointer = false; }
+    if (k === "ArrowUp" || k === "w" || k === "W") { keys.up = true; usePointer = false; }
+    if (k === "ArrowDown" || k === "s" || k === "S") { keys.down = true; usePointer = false; }
+    if (k === " ") jumpQueued = true;
+    if (k === "m" || k === "M") toggleMute();
+  });
+  window.addEventListener("keyup", (e) => {
+    const k = e.key;
+    if (k === "ArrowLeft" || k === "a" || k === "A") keys.left = false;
+    if (k === "ArrowRight" || k === "d" || k === "D") keys.right = false;
+    if (k === "ArrowUp" || k === "w" || k === "W") keys.up = false;
+    if (k === "ArrowDown" || k === "s" || k === "S") keys.down = false;
+  });
+  function pointerPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) };
+  }
+  canvas.addEventListener("pointermove", (e) => {
+    if (state !== "play") return;
+    const pos = pointerPos(e); usePointer = true;
+    player.x = clamp(pos.x, CH_L + settings.playerSize * 0.5, CH_R - settings.playerSize * 0.5);
+    player.y = clamp(pos.y, H * 0.4, H - 40);
+  });
+  canvas.addEventListener("pointerdown", () => ensureAudio());
+  document.getElementById("muteBtn").addEventListener("click", () => { ensureAudio(); toggleMute(); });
+  document.getElementById("jumpBtn").addEventListener("click", () => { ensureAudio(); if (state === "play") jumpQueued = true; });
+
+
+  /* ============================================================
+     SECTION 10 — UPDATE
+     ============================================================ */
+  function update(dt, sec) {
+    gameClock += sec;
+    updateParticles(dt, sec); updateFloaters(dt, sec);
+    if (shakeT > 0) shakeT -= sec;
+
+    if (state !== "play") { waterScroll += 0.6 * dt; return; }
+
+    const p = levelParams(level);
+    const canDive = !!BOATS[chosenBoat].canDive;
+
+    // Rapids (later levels): the river temporarily speeds up.
+    if (level >= settings.rapidsFromLevel) {
+      if (rapidsT > 0) { rapidsT -= sec; if (rapidsT <= 0) rapidsCD = rand(settings.rapidsEveryMin, settings.rapidsEveryMax); }
+      else { rapidsCD -= sec; if (rapidsCD <= 0) { rapidsT = settings.rapidsDuration; sRapids(); } }
+    }
+    const scroll = p.scroll * (rapidsT > 0 ? settings.rapidsMultiplier : 1);
+    waterScroll += scroll * dt;
+
+    levelTime += sec;
+    if (levelTime >= settings.levelDuration) { completeLevel(); return; }
+    score += settings.scorePerSecond * sec;
+    if (invincT > 0) invincT -= sec;
+
+    // Move the boat
+    player.prevX = player.x;
+    if (!usePointer) {
+      const spd = settings.playerSpeed * (BOATS[chosenBoat].handling + (save.upgrades.speedTune ? 0.2 : 0));
+      if (keys.left)  player.x -= spd * dt;
+      if (keys.right) player.x += spd * dt;
+      if (keys.up)    player.y -= spd * dt;
+      if (keys.down)  player.y += spd * dt;
+    }
+    if (rapidsT > 0) player.x += Math.sin(gameClock * 6) * 1.0 * dt;   // turbulent push
+    player.x = clamp(player.x, CH_L + settings.playerSize * 0.5, CH_R - settings.playerSize * 0.5);
+    player.y = clamp(player.y, H * 0.4, H - 40);
+
+    const vx = player.x - player.prevX;
+    player.tilt = lerp(player.tilt, clamp(vx * 0.06, -0.35, 0.35), 0.2);
+    paddleTimer -= sec;
+    if (Math.abs(vx) > 1.5 && paddleTimer <= 0) { sPaddle(); paddleTimer = 0.18; }
+
+    // Jump (normal boats) or Dive (submarine)
+    if (jumpQueued && player.special <= 0 && player.cd <= 0) {
+      player.special = settings.jumpDuration; player.cd = settings.jumpDuration + settings.jumpCooldown;
+      canDive ? sDive() : sJump();
+    }
+    jumpQueued = false;
+    if (player.special > 0) player.special -= sec;
+    if (player.cd > 0) player.cd -= sec;
+    player.airborne = player.special > 0;
+    const prog = player.airborne ? (1 - player.special / settings.jumpDuration) : 0;
+    player.hop  = (player.airborne && !canDive) ? Math.sin(prog * Math.PI) : 0;
+    player.sink = (player.airborne && canDive) ? Math.sin(prog * Math.PI) : 0;
+    if (player.sink > 0.4 && Math.random() < 0.4)   // dive bubbles
+      particles.push({ x: player.x + rand(-10, 10), y: player.y, vx: rand(-0.5, 0.5), vy: rand(-2, -1), life: 0.6, max: 0.6, size: rand(2, 4), color: "#bfe3ff" });
+
+    // Spawn
+    obstacleTimer -= sec; if (obstacleTimer <= 0) { spawnObstacleEvent(p); obstacleTimer = p.obstacleEvery; }
+    coinTimer -= sec; if (coinTimer <= 0) { spawnCoin(p); coinTimer = p.coinEvery; }
+
+    const pr = settings.playerSize * 0.3;
+
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+      const o = obstacles[i];
+      o.y += scroll * o.speedMul * dt;
+      if (o.type.drift === "dart") o.x = o.baseX + Math.sin((o.y + o.phase) * 0.06) * 38;
+      if (o.type.drift === "sway") o.x = o.baseX + Math.sin((o.y + o.phase) * 0.02) * 60;
+      o.x = clamp(o.x, CH_L + o.type.r, CH_R - o.type.r);
+      if (o.y > H + o.type.size) { obstacles.splice(i, 1); continue; }
+
+      // Jumping clears jumpable surface hazards; a diving sub clears ALL surface
+      // hazards; underwater (submerged) hazards must always be steered around.
+      const avoided = player.airborne && !o.type.submerged && (canDive || o.type.jumpable);
+      if (!avoided && invincT <= 0 && circleHit(player.x, player.y, pr, o.x, o.y, o.type.r)) {
+        obstacles.splice(i, 1); damage();
+      }
+    }
+
+    for (let i = coins.length - 1; i >= 0; i--) {
+      const c = coins[i];
+      c.y += scroll * dt;
+      if (save.upgrades.magnet) {   // coin magnet pulls nearby coins in
+        const dx = player.x - c.x, dy = player.y - c.y, d = Math.hypot(dx, dy);
+        if (d < 120 && d > 1) { c.x += (dx / d) * 2.6 * dt; c.y += (dy / d) * 2.6 * dt; }
+      }
+      if (c.y > H + c.size) { coins.splice(i, 1); continue; }
+      if (circleHit(player.x, player.y, pr, c.x, c.y, c.r)) {
+        coins.splice(i, 1);
+        score += c.value; save.wallet += c.coins;
+        floatText(c.x, c.y, "+" + c.value, c.gem ? "#9fe8ff" : "#ffe27a");
+        burst(c.x, c.y, c.gem ? "#9fe8ff" : "#ffe27a", c.gem ? 16 : 10);
+        c.gem ? sGem() : sCoin();
+      }
+    }
+  }
+  function updateParticles(dt, sec) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const a = particles[i]; a.x += a.vx * dt; a.y += a.vy * dt; a.vy += 0.12 * dt; a.life -= sec;
+      if (a.life <= 0) particles.splice(i, 1);
+    }
+  }
+  function updateFloaters(dt, sec) {
+    for (let i = floaters.length - 1; i >= 0; i--) {
+      const f = floaters[i]; f.y -= 0.5 * dt; f.life -= sec * 1.1;
+      if (f.life <= 0) floaters.splice(i, 1);
+    }
+  }
+
+
+  /* ============================================================
+     SECTION 11 — DRAW
+     ============================================================ */
+  function draw() {
+    drawRiver();
+    ctx.save();
+    if (shakeT > 0) { const m = 7 * (shakeT / 0.35); ctx.translate(rand(-m, m), rand(-m, m)); }
+
+    for (const c of coins) {
+      const bob = Math.sin(gameClock * 4 + c.phase) * 2;
+      c.gem ? drawGem(c.x, c.y + bob, c.r) : drawCoin(c.x, c.y + bob, c.r);
+    }
+    for (const o of obstacles) drawObstacle(o);
+
+    for (const a of particles) {
+      ctx.globalAlpha = clamp(a.life / a.max, 0, 1); ctx.fillStyle = a.color;
+      ctx.beginPath(); ctx.arc(a.x, a.y, a.size, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    if (state === "play" || state === "levelComplete" || state === "dock") drawBoat();
+
+    for (const f of floaters) {
+      ctx.globalAlpha = clamp(f.life, 0, 1); ctx.fillStyle = f.color;
+      ctx.font = "bold 20px " + UI_FONT; ctx.textAlign = "center"; ctx.fillText(f.text, f.x, f.y);
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    if (state === "play" && rapidsT > 0) drawRapids();
+    if (state === "play") drawHUD();
+  }
+
+  function drawRiver() {
+    // Backdrop: your photo if present, otherwise painted forest banks.
+    if (bgReady) {
+      const s = Math.max(W / bgImage.width, H / bgImage.height);
+      const iw = bgImage.width * s, ih = bgImage.height * s;
+      ctx.drawImage(bgImage, (W - iw) / 2, (H - ih) / 2, iw, ih);
+    } else {
+      ctx.fillStyle = settings.bankColor;
+      ctx.fillRect(0, 0, BANK, H); ctx.fillRect(W - BANK, 0, BANK, H);
+    }
+
+    // A STRAIGHT water channel painted down the middle (teal shallows -> deep center).
+    const wx = ctx.createLinearGradient(CH_L, 0, CH_R, 0);
+    wx.addColorStop(0, settings.waterTop); wx.addColorStop(0.5, settings.waterBottom); wx.addColorStop(1, settings.waterTop);
+    ctx.globalAlpha = bgReady ? 0.82 : 1;     // let a little of the photo show through, if any
+    ctx.fillStyle = wx; ctx.fillRect(CH_L, 0, CH_R - CH_L, H);
+    ctx.globalAlpha = 1;
+
+    // Flowing ripples (clipped to the channel so they stay in the water).
+    ctx.save(); ctx.beginPath(); ctx.rect(CH_L, 0, CH_R - CH_L, H); ctx.clip();
+    ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.lineWidth = 2;
+    for (let i = 0; i < 16; i++) {
+      const y = ((i * 50 + waterScroll) % (H + 50)) - 25;
+      ctx.beginPath();
+      for (let x = CH_L; x <= CH_R; x += 22) {
+        const yy = y + Math.sin((x + waterScroll) * 0.03) * 3;
+        x === CH_L ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    if (!bgReady) paintForestEdges();         // sandy shore + scrolling pine trees
+  }
+
+  function paintForestEdges() {
+    // Sandy shoreline next to the water
+    ctx.fillStyle = "#d8c38f";
+    ctx.fillRect(BANK - 13, 0, 13, H); ctx.fillRect(W - BANK, 0, 13, H);
+    ctx.fillStyle = "rgba(0,0,0,0.12)";
+    ctx.fillRect(BANK - 2, 0, 2, H); ctx.fillRect(W - BANK, 0, 2, H);
+    // Pine trees scrolling down both banks (gives the "moving downriver" feel)
+    for (let i = 0; i < 9; i++) {
+      const y = ((i * 95 + waterScroll * 0.85) % (H + 120)) - 60;
+      drawPine(BANK * 0.42, y, 26 + (i % 3) * 5);
+      drawPine(W - BANK * 0.5, y + 48, 24 + (i % 2) * 6);
+    }
+  }
+  function drawPine(x, y, s) {
+    ctx.fillStyle = "#5a3a1e";
+    ctx.fillRect(x - 2, y + s * 0.2, 4, s * 0.32);            // trunk
+    const greens = ["#266035", "#33824a", "#1f5230"];
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = greens[i % 3];
+      const ty = y + s * 0.2 - i * s * 0.26, tw = s * (0.46 - i * 0.1);
+      ctx.beginPath(); ctx.moveTo(x, ty - s * 0.42); ctx.lineTo(x - tw, ty); ctx.lineTo(x + tw, ty); ctx.closePath(); ctx.fill();
+    }
+  }
+
+  function drawRapids() {
+    ctx.fillStyle = "rgba(255,255,255,0.06)"; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 3;
+    for (let i = 0; i < 10; i++) {
+      const y = ((i * 75 + waterScroll * 1.6) % (H + 75)) - 30;
+      const x = rand(CH_L, CH_R - 40);
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 30, y - 4); ctx.stroke();
+    }
+    ctx.fillStyle = "#fff"; ctx.font = "bold 22px " + UI_FONT; ctx.textAlign = "center";
+    ctx.globalAlpha = 0.6 + 0.4 * Math.abs(Math.sin(gameClock * 6));
+    ctx.fillText("🌊 RAPIDS! 🌊", W / 2, 92); ctx.globalAlpha = 1;
+  }
+
+  // A floating shadow + ripple ring so things look ON the water (not submerged).
+  function floatShadow(x, y, rx) {
+    ctx.globalAlpha = 0.22; ctx.fillStyle = "#06283d";
+    ctx.beginPath(); ctx.ellipse(x, y + rx * 0.55, rx, rx * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 0.18; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(x, y + rx * 0.5, rx * 1.1, rx * 0.5, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawObstacle(o) {
+    if (o.type.draw === "log")   return drawLog(o.x, o.y);
+    if (o.type.draw === "stick") return drawStick(o.x, o.y, o.phase);
+    if (o.type.draw === "fish")  return drawFish(o.x, o.y, o.color, o.phase);
+    if (o.type.draw === "whirl") return drawWhirl(o.x, o.y, o.type.r + 6, o.phase);
+    floatShadow(o.x, o.y, o.type.size * 0.4);          // rock / fisherman boat (emoji)
+    drawEmoji(o.type.emoji, o.x, o.y, o.type.size);
+  }
+  function drawCoin(x, y, r) {
+    floatShadow(x, y, r * 0.95);
+    const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.2, x, y, r);
+    g.addColorStop(0, "#fff3b0"); g.addColorStop(0.55, "#f4c430"); g.addColorStop(1, "#c8950f");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#9a7000"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.beginPath(); ctx.ellipse(x - r * 0.3, y - r * 0.35, r * 0.22, r * 0.12, -0.6, 0, Math.PI * 2); ctx.fill();
+  }
+  function drawGem(x, y, r) {
+    floatShadow(x, y, r * 0.95);
+    ctx.save(); ctx.translate(x, y);
+    ctx.fillStyle = "#3aa0ff";
+    ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r * 0.8, -r * 0.2); ctx.lineTo(0, r); ctx.lineTo(-r * 0.8, -r * 0.2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#bfe3ff";
+    ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r * 0.8, -r * 0.2); ctx.lineTo(0, -r * 0.1); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#1f6fcc"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r * 0.8, -r * 0.2); ctx.lineTo(0, r); ctx.lineTo(-r * 0.8, -r * 0.2); ctx.closePath(); ctx.stroke();
+    ctx.restore();
+  }
+  function drawLog(x, y) {
+    floatShadow(x, y, 28);
+    ctx.save(); ctx.translate(x, y);
+    ctx.fillStyle = "#8a5a2b"; roundRect(-29, -10, 58, 20, 9); ctx.fill();
+    ctx.fillStyle = "#a06a35"; ctx.beginPath(); ctx.ellipse(26, 0, 5, 9, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#6e4420"; ctx.lineWidth = 2;
+    for (let gx = -18; gx <= 16; gx += 9) { ctx.beginPath(); ctx.moveTo(gx, -7); ctx.lineTo(gx, 7); ctx.stroke(); }
+    ctx.restore();
+  }
+  function drawStick(x, y, phase) {
+    floatShadow(x, y, 16);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(0.5 + (phase % 1));
+    ctx.fillStyle = "#7a4a23"; roundRect(-18, -4, 36, 8, 4); ctx.fill();
+    ctx.fillStyle = "#5c3818"; roundRect(-18, -1, 36, 2, 1); ctx.fill();
+    ctx.restore();
+  }
+  function drawFish(x, y, color, phase) {
+    floatShadow(x, y, 15);
+    ctx.save(); ctx.translate(x, y); ctx.scale(Math.sin(phase) >= 0 ? 1 : -1, 1);
+    ctx.fillStyle = color || "#e0473a";
+    ctx.beginPath(); ctx.ellipse(0, 0, 15, 9, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-13, 0); ctx.lineTo(-22, -7); ctx.lineTo(-22, 7); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(7, -2, 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#222"; ctx.beginPath(); ctx.arc(7.6, -2, 1.2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  function drawWhirl(x, y, r, phase) {
+    // Submerged hazard: drawn recessed, under a translucent water sheen.
+    ctx.save(); ctx.translate(x, y); ctx.rotate(gameClock * 1.5 + phase);
+    ctx.fillStyle = "rgba(6,36,54,0.55)"; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(180,220,240,0.5)"; ctx.lineWidth = 3;
+    for (let a = 0; a < 3; a++) { ctx.beginPath(); ctx.arc(0, 0, r - 4 - a * 5, a * 2, a * 2 + Math.PI * 1.3); ctx.stroke(); }
+    ctx.restore();
+    ctx.fillStyle = "rgba(30,120,170,0.35)"; ctx.beginPath(); ctx.arc(x, y, r + 3, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function drawBoat() {
+    const size = settings.playerSize;
+    const lift = player.hop * settings.jumpLift;
+    // shadow (smaller as you hop, bigger as you dive)
+    ctx.globalAlpha = 0.25 * (1 - player.hop * 0.6) + player.sink * 0.1; ctx.fillStyle = "#06283d";
+    ctx.beginPath(); ctx.ellipse(player.x, player.y + 8, size * 0.32, size * 0.16, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    ctx.save();
+    ctx.translate(player.x, player.y - lift);
+    ctx.rotate(player.tilt);
+    ctx.scale(1 + player.hop * 0.25 - player.sink * 0.3, 1 + player.hop * 0.25 - player.sink * 0.3);
+    let alpha = 1;
+    if (player.sink > 0) alpha = 1 - player.sink * 0.45;
+    if (invincT > 0) alpha *= 0.4 + 0.6 * Math.abs(Math.sin(gameClock * 20));
+    ctx.globalAlpha = alpha;
+    if (BOATS[chosenBoat].draw === "sub") drawSub(size); else drawEmoji(BOATS[chosenBoat].emoji, 0, 0, size);
+    if (save.upgrades.crown) drawEmoji("👑", 0, -size * 0.46, size * 0.5);
+    if (save.upgrades.flag)  drawEmoji("🚩", size * 0.34, -size * 0.34, size * 0.5);
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    if (player.shield) {
+      ctx.strokeStyle = "rgba(150,230,255,0.85)"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(player.x, player.y - lift, size * 0.62, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+  function drawSub(size) {
+    ctx.fillStyle = "#f2c230"; roundRect(-size * 0.5, -size * 0.22, size, size * 0.44, size * 0.2); ctx.fill();
+    ctx.fillStyle = "#d9a91f"; roundRect(-size * 0.12, -size * 0.4, size * 0.24, size * 0.2, 4); ctx.fill();
+    ctx.fillStyle = "#bfe3ff"; ctx.beginPath(); ctx.arc(size * 0.16, 0, size * 0.12, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#9a7c12"; ctx.lineWidth = 2; ctx.stroke();
+  }
+
+  function drawEmoji(emoji, x, y, size) {
+    ctx.font = size + "px " + EMOJI_FONT; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(emoji, x, y);
+  }
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+
+  function drawHUD() {
+    ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(0, 0, W, 6);
+    ctx.fillStyle = "#ffd76a"; ctx.fillRect(0, 0, W * (levelTime / settings.levelDuration), 6);
+    ctx.textBaseline = "alphabetic"; ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = 4;
+    ctx.fillStyle = "#fff"; ctx.font = "bold 22px " + UI_FONT; ctx.textAlign = "left";
+    ctx.fillText("⭐ " + Math.floor(score), 14, 36);
+    ctx.fillStyle = "#cfe7ff"; ctx.font = "bold 14px " + UI_FONT;
+    ctx.fillText("Level " + level + "   🪙 " + save.wallet, 16, 58);
+    ctx.textAlign = "right"; ctx.font = "20px " + EMOJI_FONT;
+    ctx.fillText("❤️".repeat(Math.max(0, lives)), W - 12, 36);
+    ctx.shadowBlur = 0;
+  }
+
+
+  /* ============================================================
+     SECTION 12 — Menus (select, dock/shop, level complete, game over)
+     ============================================================ */
+  function hideOverlay() { overlay.style.display = "none"; }
+  function showOverlay(html) { overlay.innerHTML = '<div class="panel">' + html + "</div>"; overlay.style.display = "flex"; }
+
+  function loadBoard() { try { return JSON.parse(localStorage.getItem("riverRunBoard")) || []; } catch (e) { return []; } }
+  function saveBoard(b) { try { localStorage.setItem("riverRunBoard", JSON.stringify(b)); } catch (e) {} }
+  function commitScore(name) {
+    const b = loadBoard();
+    const entry = { name: (name || "Anonymous").slice(0, 14), score: Math.floor(score), level };
+    b.push(entry); b.sort((a, c) => c.score - a.score);
+    const top = b.slice(0, 10); saveBoard(top); return { board: top, entry };
+  }
+  function boardHTML(board, mine) {
+    if (!board.length) return '<p class="muted">No scores yet — be the first!</p>';
+    return '<ol class="board">' + board.map(e => {
+      const me = mine && e.name === mine.name && e.score === mine.score && e.level === mine.level;
+      return `<li class="${me ? "me" : ""}"><span>${escapeHtml(e.name)}</span><b>${e.score}</b><em>Lv ${e.level}</em></li>`;
+    }).join("") + "</ol>";
+  }
+
+  function showSelect() {
+    state = "select";
+    showOverlay(`
+      <h2>🛶 River Run</h2>
+      <p>Budget: 🪙 <b>${save.wallet}</b></p>
+      <p>Pick a boat to start</p>
+      <div class="boats">
+        <button class="boat-btn" data-boat="canoe"><span>🛶</span>Canoe</button>
+        <button class="boat-btn" data-boat="tube"><span>🛟</span>Lazy Tube</button>
+      </div>
+      <div class="row"><button id="dockBtn" class="secondary">🛟 Dock &amp; Shop</button></div>
+      <div class="how">Steer ← ↑ → ↓ · Space = jump/dive · grab 🪙 · dodge 🪨 · level up every ${settings.levelDuration}s</div>
+      <h3>🏆 Leaderboard</h3>
+      ${boardHTML(loadBoard().slice(0, 5))}
+    `);
+    overlay.querySelectorAll(".boat-btn").forEach(btn => btn.onclick = () => {
+      chosenBoat = btn.dataset.boat; save.chosenBoat = chosenBoat; persist(); ensureAudio(); hideOverlay(); startGame();
+    });
+    document.getElementById("dockBtn").onclick = () => { ensureAudio(); showDock("select"); };
+  }
+
+  function showDock(from) {
+    state = "dock"; dockFrom = from;
+    const boatsHtml = Object.keys(BOATS).map(key => {
+      const b = BOATS[key], owned = save.ownedBoats.includes(key), sel = chosenBoat === key;
+      if (owned) return `<button class="boat-tile ${sel ? "sel" : ""}" data-pick="${key}"><span>${b.emoji}</span>${b.name}</button>`;
+      return `<div class="boat-tile locked"><span>🔒</span>${b.name}<em>Level ${b.unlockLevel}</em></div>`;
+    }).join("");
+    const shopHtml = Object.keys(UPGRADES).map(key => {
+      const u = UPGRADES[key], owned = !!save.upgrades[key], afford = save.wallet >= u.cost;
+      if (owned) return `<div class="shop-item owned">${u.name}<b>Owned ✓</b></div>`;
+      return `<button class="shop-item ${afford ? "" : "cant"}" data-buy="${key}" ${afford ? "" : "disabled"}>${u.name}<b>🪙 ${u.cost}</b></button>`;
+    }).join("");
+    showOverlay(`
+      <h2>🛟 Your Dock</h2>
+      <p>Budget: 🪙 <b>${save.wallet}</b></p>
+      <h3>Your boats</h3><div class="grid">${boatsHtml}</div>
+      <h3>Customize (spend coins)</h3><div class="grid">${shopHtml}</div>
+      <button id="dockDone">${from === "select" ? "Start race ▶" : "Continue ▶"}</button>
+    `);
+    overlay.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => {
+      chosenBoat = b.dataset.pick; save.chosenBoat = chosenBoat; persist(); showDock(from);
+    });
+    overlay.querySelectorAll("[data-buy]").forEach(b => b.onclick = () => {
+      const key = b.dataset.buy, u = UPGRADES[key];
+      if (!save.upgrades[key] && save.wallet >= u.cost) { save.wallet -= u.cost; save.upgrades[key] = true; persist(); sBuy(); }
+      showDock(from);
+    });
+    document.getElementById("dockDone").onclick = () => {
+      if (dockFrom === "select") { hideOverlay(); startGame(); } else resumeNextLevel();
+    };
+  }
+
+  function showLevelComplete(completed) {
+    let html = `<h2>Level ${completed} complete! 🎉</h2><p>Score: <b>${Math.floor(score)}</b> · Budget: <b>${save.wallet} 🪙</b></p>`;
+    if (level % settings.checkpointEvery === 0) html += `<p>⛳ <b>Checkpoint reached — Level ${level}!</b></p>`;
+    if (completed === 1) {
+      const pref = escapeHtml(playerName || save.lastName || "");
+      html += `<p>For the leaderboard — who's playing? Keep the name or type a new one (a different player can take over), then Save. Optional.</p>
+        <div class="row"><input id="nameInput" maxlength="14" placeholder="Player name" value="${pref}" /><button id="saveName" class="secondary">Save</button></div>`;
+    }
+    if (newlyUnlocked) { const b = BOATS[newlyUnlocked]; html += `<p>✨ New boat unlocked: <b>${b.emoji} ${b.name}</b>!</p>`; }
+    html += `<div class="row"><button id="dockBtn" class="secondary">🛟 Dock &amp; Shop</button><button id="continueBtn" class="primary">Keep going ▶</button></div>`;
+    showOverlay(html);
+
+    const nameInput = document.getElementById("nameInput");
+    const saveBtn = document.getElementById("saveName");
+    if (saveBtn) saveBtn.onclick = () => { const v = nameInput.value.trim(); if (v) { rememberName(v); saveBtn.textContent = "Saved ✓"; } };
+    document.getElementById("dockBtn").onclick = () => {
+      if (nameInput && nameInput.value.trim()) rememberName(nameInput.value.trim());
+      showDock("level");
+    };
+    document.getElementById("continueBtn").onclick = () => {
+      if (nameInput && nameInput.value.trim()) rememberName(nameInput.value.trim());
+      resumeNextLevel();
+    };
+  }
+
+  function showGameOver() {
+    const hasScore = Math.floor(score) > 0;
+    let html = `<h2>Game Over</h2><p>Score <b>${Math.floor(score)}</b> · reached <b>Level ${level}</b> · 🪙 ${save.wallet}</p>`;
+    if (checkpointLevel >= settings.checkpointEvery)
+      html += `<div class="row"><button id="cont" class="primary">▶ Continue from Level ${checkpointLevel}</button></div>`;
+    if (hasScore) {
+      const pref = escapeHtml(playerName || save.lastName || "");
+      html += `<p>Add this score to the leaderboard? Who's playing — keep the name or type a new one, then Save.</p>
+        <div class="row"><input id="goName" maxlength="14" placeholder="Player name" value="${pref}" /><button id="goSave" class="secondary">Save</button></div>`;
+    }
+    html += `<h3>🏆 Leaderboard</h3><div id="boardWrap">${boardHTML(loadBoard().slice(0, 10))}</div>
+      <button id="again">Play again from start</button>`;
+    showOverlay(html);
+
+    const cont = document.getElementById("cont");
+    if (cont) cont.onclick = () => continueFromCheckpoint();
+    const goSave = document.getElementById("goSave");
+    if (goSave) goSave.onclick = () => {
+      const v = document.getElementById("goName").value.trim();
+      if (!v) return;                       // must type a name (same or new) to save
+      rememberName(v);
+      const r = commitScore(v);
+      document.getElementById("boardWrap").innerHTML = boardHTML(r.board, r.entry);
+      goSave.textContent = "Saved ✓"; goSave.disabled = true;
+    };
+    document.getElementById("again").onclick = () => showSelect();
+  }
+
+
+  /* ============================================================
+     SECTION 13 — Game loop
+     ============================================================ */
+  let lastTime = performance.now();
+  function loop(now) {
+    let delta = now - lastTime; lastTime = now; delta = Math.min(delta, 50);
+    const dt = delta / 16.6667, sec = delta / 1000;
+    update(dt, sec); draw();
+    requestAnimationFrame(loop);
+  }
+  showSelect();
+  requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
