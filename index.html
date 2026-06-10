@@ -232,6 +232,7 @@
     waterTop:    "#49a9c0",     // teal "shallows" near the banks
     waterBottom: "#1d6699",     // deep blue in the middle
     bankColor:   "#2f7d44",     // forest green banks
+    bgChannelOpacity: 0.9,      // with a background photo, how opaque the play river is (1 = hide the photo there)
 
     // ----- You (the boat) -----
     playerSize:  46,
@@ -797,10 +798,10 @@
     // A STRAIGHT water channel down the middle. Over the photo it feathers to transparent at
     // the edges so it blends into the banks (no hard seam); the painted mode stays solid.
     if (bgReady) {
-      const t = settings.waterTop, d = settings.waterBottom, wx = ctx.createLinearGradient(CH_L, 0, CH_R, 0);
-      wx.addColorStop(0, hexA(t, 0)); wx.addColorStop(0.06, hexA(t, 0.58));
-      wx.addColorStop(0.5, hexA(d, 0.58));
-      wx.addColorStop(0.94, hexA(t, 0.58)); wx.addColorStop(1, hexA(t, 0));
+      const t = settings.waterTop, d = settings.waterBottom, op = settings.bgChannelOpacity, wx = ctx.createLinearGradient(CH_L, 0, CH_R, 0);
+      wx.addColorStop(0, hexA(t, 0)); wx.addColorStop(0.06, hexA(t, op));
+      wx.addColorStop(0.5, hexA(d, op));
+      wx.addColorStop(0.94, hexA(t, op)); wx.addColorStop(1, hexA(t, 0));
       ctx.fillStyle = wx; ctx.fillRect(CH_L, 0, CH_R - CH_L, H);
     } else {
       const wx = ctx.createLinearGradient(CH_L, 0, CH_R, 0);
