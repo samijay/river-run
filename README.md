@@ -10,6 +10,8 @@ file (`index.html`) with friendly comments and a clearly-marked **TWEAK ZONE**.
 
 **▶ Play it online:** https://river-run-lyart.vercel.app
 
+*A game by **Ezra & Eli Simon-Harris** — 🎮 E Brothers Gaming Corp. · June 9, 2026*
+
 ---
 
 ## ▶️ How to play
@@ -96,3 +98,10 @@ The code is split into labeled `SECTION` comments to help you find things:
 - Sounds are generated live by the browser's **Web Audio**, so there are no sound files either.
 
 Have fun out there! 🛶⭐
+
+---
+
+## 🎮 Credits
+
+**River Run** — a game by **Ezra & Eli Simon-Harris**
+🎮 **E Brothers Gaming Corp.** · June 9, 2026

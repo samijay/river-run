@@ -8,6 +8,9 @@
   <!--
     ============================================================
       🛶  RIVER RUN  🛶   — a tiny river-boat game
+    ------------------------------------------------------------
+      A game by Ezra & Eli Simon-Harris
+      🎮 E Brothers Gaming Corp.  ·  June 9, 2026
     ============================================================
     HOW TO PLAY: double-click index.html. To CHANGE the game,
     open this file in a text editor, find the "TWEAK ZONE"
@@ -26,6 +29,8 @@
       gap: 12px; padding: 16px; box-sizing: border-box; text-align: center;
     }
     h1 { margin: 0; font-size: 26px; letter-spacing: 1px; }
+    .byline { margin: 2px 0 0; font-size: 13px; color: #9fb6cc; }
+    .byline b { color: #ffd76a; }
 
     #stage { position: relative; width: 100%; max-width: 460px; }
     canvas {
@@ -114,6 +119,7 @@
 </head>
 <body>
   <h1>🛶 River Run</h1>
+  <p class="byline">A game by <b>Ezra &amp; Eli Simon-Harris</b> · 🎮 E Brothers Gaming Corp.</p>
 
   <div id="stage">
     <canvas id="game" width="460" height="720"></canvas>
@@ -893,6 +899,7 @@
       <div class="how">Steer ← ↑ → ↓ · Space = jump/dive · grab 🪙 · dodge 🪨 · level up every ${settings.levelDuration}s</div>
       <h3>🏆 Leaderboard</h3>
       ${boardHTML(loadBoard().slice(0, 5))}
+      <p class="muted" style="margin-top:14px;font-size:12px;">🎮 E Brothers Gaming Corp. · by Ezra &amp; Eli Simon-Harris · © 2026</p>
     `);
     overlay.querySelectorAll(".boat-btn").forEach(btn => btn.onclick = () => {
       chosenBoat = btn.dataset.boat; save.chosenBoat = chosenBoat; persist(); ensureAudio(); hideOverlay(); startGame();
