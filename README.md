@@ -20,10 +20,10 @@ file (`index.html`) with friendly comments and a clearly-marked **TWEAK ZONE**.
 2. **Double-click `index.html`.** It opens in your web browser — nothing to install!
 3. Pick your boat (🛶 Canoe or 🛟 Lazy Tube) and go.
 
-**Controls**
-| Action | Keys | Or… |
+**Controls** — three ways to steer, whichever feels best:
+| Action | Keys | Touch / mouse |
 |---|---|---|
-| Steer | **← ↑ → ↓** arrow keys (or **W A S D**) | move your **mouse / finger** |
+| Steer | **← ↑ → ↓** arrows (or **W A S D**) | **hold** the mouse / finger on the river to glide there, or use the on-screen **◀ ▶** buttons |
 | Jump (hop over rocks, logs, sticks) | **Spacebar** | the **⤴ Jump** button |
 | Sound on/off | **M** | the **🔊** button |
 
@@ -41,6 +41,8 @@ very top shows how close you are to the next level.
 | 2 | **Brown logs & sticks**, plus "rock walls" with a gap to thread |
 | 3 | **Red / yellow / green fish** that weave (can't jump these!) + **blue gems** 💎 worth 50 |
 | 4+ | **Fisherman boats** 🚣 that drift side to side, faster water, more coins |
+| **5** | 🦦 **Surprise! A river otter joins** you and gives a permanent **+1 life** |
+| **7** | 🐶 **Surprise! Olive the cavapoo** (black, with a white chin) hops aboard your boat |
 | 5, 10, 15… | **Rapids** speed the river up — and every 5th level is a **checkpoint** |
 | 10+ | **Submerged whirlpools** lurk underwater — steer around them |
 
@@ -48,11 +50,29 @@ very top shows how close you are to the next level.
 > The **Submarine** is special: it **dives** (Space) to slip under everything on the surface.
 
 **Leaderboard:** after Level 1 (and at Game Over) the game always asks **who's playing** —
-keep the name or type a new one, so siblings can take turns. Top scores save on your computer.
+keep the name or type a new one, so siblings can take turns. Scores save on your device, and once
+the online store is connected (below), the board goes **🌐 global** — everyone who opens the link
+competes on one shared leaderboard.
 
 **Boats unlock every 3 levels:** ⛵ Sailboat (Lv 3), 🚤 Speedboat (Lv 6), 🤿 Submarine (Lv 9).
 Between levels, tap **🛟 Dock & Shop** to switch to any boat you own, or spend coins on upgrades
 (Racing Flag, Golden Crown, Coin Magnet, Bumper Shield, Speed Tune, Extra Heart).
+
+---
+
+## 🌐 Global leaderboard (multiplayer-ready)
+
+Out of the box, scores save per device. To turn on **one shared leaderboard for everyone who opens
+the link** (the foundation for future multiplayer), connect a free Redis store to the Vercel project
+— **no code changes needed**:
+
+1. **Vercel dashboard** → the **sunriverrun** project → **Storage** → **Create Database**.
+2. Choose **Upstash for Redis** (free tier) and connect it to the project. Vercel auto-adds the
+   `KV_REST_API_URL` and `KV_REST_API_TOKEN` environment variables.
+3. **Redeploy** (or push a commit). Done — the in-game board now reads **🌐 Global Leaderboard**.
+
+Until then, the game just uses the on-device board, so nothing breaks. The backend is a tiny
+serverless function (`api/scores.js`) that keeps each player's best score.
 
 ---
 
@@ -86,7 +106,7 @@ The code is split into labeled `SECTION` comments to help you find things:
 - **Day/night** — change the water colors as the levels go up.
 - **Combo bonus** — extra points for grabbing coins without getting hit.
 - **More boats** — add one to the `BOATS` list with an `unlockLevel` of 12, 15, …
-- **Your own backdrop** — drop a picture at `assets/river-bg.png` (see that folder's note).
+- **Swap the backdrop** — replace `assets/river-bg.jpg` with any tall picture (see that folder's note).
 
 ---
 
@@ -94,8 +114,9 @@ The code is split into labeled `SECTION` comments to help you find things:
 
 - **Plain HTML, CSS, and JavaScript** — no frameworks, no build step, nothing to install.
 - It draws on an **HTML `<canvas>`** (a digital sketchpad the code paints ~60 times a second).
-- The art is drawn by code (coins, gems, logs, fish, the forest, the boats) plus a few **emoji** — no image files needed.
+- The art is drawn by code (coins, gems, logs, fish, the otter & Olive, the boats) plus a few **emoji**, over one cartoony **background image** (`assets/river-bg.jpg`).
 - Sounds are generated live by the browser's **Web Audio**, so there are no sound files either.
+- The **global leaderboard** is a tiny Vercel serverless function (`api/scores.js`) backed by Redis.
 
 Have fun out there! 🛶⭐
 

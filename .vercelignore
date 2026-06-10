@@ -1,2 +1,4 @@
 .claude
 .gitignore
+.DS_Store
+assets/river-bg-source.png
