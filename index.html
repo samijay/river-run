@@ -71,6 +71,8 @@
       display: flex; flex-direction: column; gap: 6px; align-items: center;
     }
     .boat-btn span { font-size: 36px; }
+    .tube-icon { display: inline-block; width: 34px; height: 34px; border-radius: 50%;
+      border: 9px solid #2a2a2e; background: rgba(36,104,134,0.55); box-sizing: border-box; }
     .boat-btn:hover { border-color: #5fb0ff; background: #1a466a; }
 
     button.primary, #again, #continueBtn, #dockDone {
@@ -271,7 +273,7 @@
   // Boats unlock every 3 levels. handling = how nimble. canDive = it's a submarine.
   const BOATS = {
     canoe:     { emoji: "🛶", name: "Canoe",      handling: 1.0,  unlockLevel: 1 },
-    tube:      { emoji: "🛟", name: "Lazy Tube",  handling: 0.85, unlockLevel: 1 },
+    tube:      { emoji: "🛟", name: "Lazy Tube",  handling: 0.85, unlockLevel: 1, draw: "tube" },
     sailboat:  { emoji: "⛵", name: "Sailboat",   handling: 1.15, unlockLevel: 3 },
     speedboat: { emoji: "🚤", name: "Speedboat",  handling: 1.35, unlockLevel: 6 },
     submarine: { emoji: "🤿", name: "Submarine",  handling: 1.2,  unlockLevel: 9, canDive: true, draw: "sub" },
@@ -984,7 +986,9 @@
     if (player.sink > 0) alpha = 1 - player.sink * 0.45;
     if (invincT > 0) alpha *= 0.4 + 0.6 * Math.abs(Math.sin(gameClock * 20));
     ctx.globalAlpha = alpha;
-    if (BOATS[chosenBoat].draw === "sub") drawSub(size); else drawEmoji(BOATS[chosenBoat].emoji, 0, 0, size);
+    if (BOATS[chosenBoat].draw === "sub") drawSub(size);
+    else if (BOATS[chosenBoat].draw === "tube") drawTube(size);
+    else drawEmoji(BOATS[chosenBoat].emoji, 0, 0, size);
     if (save.olive) drawOlive(-size * 0.18, -size * 0.16, size * 0.46);   // 🐶 riding along
     if (save.upgrades.crown) drawEmoji("👑", 0, -size * 0.46, size * 0.5);
     if (save.upgrades.flag)  drawEmoji("🚩", size * 0.34, -size * 0.34, size * 0.5);
@@ -1001,6 +1005,16 @@
       const oy = player.y + size * 0.18 + Math.sin(gameClock * 3) * 3;
       drawOtter(ox, oy, size * 0.5);
     }
+  }
+  function drawTube(size) {
+    const rOut = size * 0.5, rIn = size * 0.24;
+    const g = ctx.createRadialGradient(-size * 0.12, -size * 0.12, rIn, 0, 0, rOut);
+    g.addColorStop(0, "#3c3c42"); g.addColorStop(1, "#1b1b1f");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, rOut, 0, Math.PI * 2); ctx.fill();                          // black inflatable ring
+    ctx.fillStyle = "rgba(36,104,134,0.5)"; ctx.beginPath(); ctx.arc(0, 0, rIn, 0, Math.PI * 2); ctx.fill();      // watery center
+    ctx.strokeStyle = "rgba(255,255,255,0.22)"; ctx.lineWidth = size * 0.05;                                      // top sheen
+    ctx.beginPath(); ctx.arc(0, 0, (rOut + rIn) / 2, Math.PI * 1.05, Math.PI * 1.55); ctx.stroke();
+    ctx.fillStyle = "#4a4a52"; ctx.beginPath(); ctx.arc(rOut * 0.66, -rOut * 0.66, size * 0.06, 0, Math.PI * 2); ctx.fill();   // valve
   }
   function drawSub(size) {
     ctx.fillStyle = "#f2c230"; roundRect(-size * 0.5, -size * 0.22, size, size * 0.44, size * 0.2); ctx.fill();
@@ -1160,6 +1174,8 @@
     const tid = setTimeout(go, 3600);
   }
 
+  function boatIcon(key, emoji) { return key === "tube" ? '<span class="tube-icon"></span>' : `<span>${emoji}</span>`; }
+
   function showSelect() {
     state = "select";
     showOverlay(`
@@ -1168,7 +1184,7 @@
       <p>Pick a boat to start</p>
       <div class="boats">
         <button class="boat-btn" data-boat="canoe"><span>🛶</span>Canoe</button>
-        <button class="boat-btn" data-boat="tube"><span>🛟</span>Lazy Tube</button>
+        <button class="boat-btn" data-boat="tube"><span class="tube-icon"></span>Lazy Tube</button>
       </div>
       <div class="row"><button id="dockBtn" class="secondary">🛟 Dock &amp; Shop</button></div>
       <div class="how">Steer ← ↑ → ↓ · Space = jump/dive · grab 🪙 · dodge 🪨 · level up every ${settings.levelDuration}s</div>
@@ -1187,7 +1203,7 @@
     state = "dock"; dockFrom = from;
     const boatsHtml = Object.keys(BOATS).map(key => {
       const b = BOATS[key], owned = save.ownedBoats.includes(key), sel = chosenBoat === key;
-      if (owned) return `<button class="boat-tile ${sel ? "sel" : ""}" data-pick="${key}"><span>${b.emoji}</span>${b.name}</button>`;
+      if (owned) return `<button class="boat-tile ${sel ? "sel" : ""}" data-pick="${key}">${boatIcon(key, b.emoji)}${b.name}</button>`;
       return `<div class="boat-tile locked"><span>🔒</span>${b.name}<em>Level ${b.unlockLevel}</em></div>`;
     }).join("");
     const shopHtml = Object.keys(UPGRADES).map(key => {
