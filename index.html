@@ -268,6 +268,8 @@
     checkpointEvery: 5,         // a checkpoint every 5 levels
     submergeFromLevel: 10,      // underwater hazards start here
 
+    comboWindow: 4,             // seconds before your coin streak resets
+    celebrateDuration: 0.9,     // the level-up celebration beat
     soundOn: true,
   };
 
@@ -345,10 +347,14 @@
   let obstacleTimer = 0, coinTimer = 0, invincT = 0, shakeT = 0;
   let rapidsT = 0, rapidsCD = 0;
   let waterScroll = 0, gameClock = 0;
+  let combo = 0, comboTimer = 0;            // coin/graze streak -> score & coin multiplier
+  let freezeT = 0, flashT = 0;              // hit-stop freeze-frame + screen flash
+  let celebrateT = 0, celebrateLevel = 0;   // the level-up celebration beat
+  let wake = [];                            // foamy boat-wake trail
 
   const player = {
     x: W / 2, y: H - 130, prevX: W / 2,
-    tilt: 0, special: 0, cd: 0, hop: 0, sink: 0, airborne: false, shield: false,
+    tilt: 0, special: 0, cd: 0, hop: 0, sink: 0, airborne: false, shield: false, squashT: 0,
   };
   let jumpQueued = false;
   const keys = { left: false, right: false, up: false, down: false };
@@ -364,6 +370,7 @@
   const lerp = (a, b, t) => a + (b - a) * t;
   const pick = (list) => list[Math.floor(Math.random() * list.length)];
   const hexA = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; };
+  function comboMult() { return Math.min(1 + Math.floor(combo / 3), 5); }   // x1 .. x5 as the streak grows
   function circleHit(ax, ay, ar, bx, by, br) {
     const dx = ax - bx, dy = ay - by; return dx * dx + dy * dy < (ar + br) * (ar + br);
   }
@@ -434,6 +441,9 @@
   const sRapids = () => noiseBurst(0.6, 900, 0.07);
   const sBark   = () => { tone(440, 0.07, "square", 0.05); tone(620, 0.07, "square", 0.05, 0.08); };
   const sOtter  = () => { tone(900, 0.08, "sine", 0.05); tone(1200, 0.08, "sine", 0.05, 0.08); tone(1500, 0.07, "sine", 0.04, 0.16); };
+  const sCoinCombo = (n) => { const base = 740 + Math.min(n, 18) * 45; tone(base, 0.09, "sine", 0.055); tone(base / 2, 0.1, "sine", 0.03); tone(base * 1.5, 0.08, "sine", 0.04, 0.05); };
+  const sGraze  = () => { noiseBurst(0.1, 1700, 0.04); tone(1250, 0.06, "sine", 0.04); };
+  function buzz(p) { if (!muted && navigator.vibrate) { try { navigator.vibrate(p); } catch (e) {} } }   // Android haptics (no-op on iOS)
   function toggleMute() {
     muted = !muted; if (masterGain) masterGain.gain.value = muted ? 0 : 1;
     document.getElementById("muteBtn").textContent = muted ? "🔇" : "🔊";
@@ -513,12 +523,14 @@
     player.x = W / 2; player.y = H - 130; player.prevX = W / 2;
     player.tilt = 0; player.special = 0; player.cd = 0; player.hop = 0; player.sink = 0; player.airborne = false;
     pointerTarget.x = W / 2; pointerTarget.y = H - 130;
+    player.squashT = 0; wake = [];
     invincT = 0; shakeT = 0; jumpQueued = false; usePointer = false; releaseAll();   // no input survives a state change
   }
 
   function startGame() {
     level = 1; levelTime = 0; score = 0; checkpointLevel = 0; checkpointScore = 0;
-    obstacles = []; coins = []; particles = []; floaters = [];
+    obstacles = []; coins = []; particles = []; floaters = []; wake = [];
+    combo = 0; comboTimer = 0; freezeT = 0; flashT = 0;
     applyUpgradesToRun(); resetPlayerPos(); primeTimers();
     state = "play";
   }
@@ -534,7 +546,11 @@
     if (completed === 5 && !save.otter) { save.otter = true; otterJustJoined = true; lives++; sOtter(); }  // 🦦 +1 life!
     if (completed === 7 && !save.olive) { save.olive = true; oliveJustJoined = true; }                     // 🐶 surprise!
     persist();
-    state = "levelComplete"; sLevel(); showLevelComplete(completed);
+    // a quick celebration beat, THEN the level-complete menu
+    celebrateLevel = completed; celebrateT = settings.celebrateDuration; flashT = 0.25;
+    burst(player.x, player.y, "#ffd76a", 30); burst(player.x, player.y, "#fff3b0", 16);
+    sLevel(); buzz([25, 35, 25]);
+    state = "celebrate";
   }
 
   function resumeNextLevel() {
@@ -544,13 +560,15 @@
 
   function continueFromCheckpoint() {
     level = checkpointLevel; score = checkpointScore; levelTime = 0;
-    obstacles = []; coins = []; particles = []; floaters = [];
+    obstacles = []; coins = []; particles = []; floaters = []; wake = [];
+    combo = 0; comboTimer = 0;
     applyUpgradesToRun(); resetPlayerPos(); primeTimers(); hideOverlay(); state = "play";
   }
 
   function damage() {
-    if (player.shield) { player.shield = false; invincT = 1.0; burst(player.x, player.y, "#9fe8ff", 18); sShield(); return; }
-    lives--; burst(player.x, player.y, "#ff7a7a", 16); shakeT = 0.35; invincT = 1.2; sSplash();
+    combo = 0; comboTimer = 0;
+    if (player.shield) { player.shield = false; invincT = 1.0; freezeT = 0.07; burst(player.x, player.y, "#9fe8ff", 18); sShield(); buzz(40); return; }
+    lives--; freezeT = 0.09; flashT = 0.12; burst(player.x, player.y, "#ff7a7a", 16); shakeT = 0.4; invincT = 1.2; sSplash(); buzz(70);
     if (lives <= 0) { state = "over"; persist(); showGameOver(); }
   }
 
@@ -638,10 +656,18 @@
      SECTION 10 — UPDATE
      ============================================================ */
   function update(dt, sec) {
+    if (freezeT > 0) { freezeT -= sec; return; }      // hit-stop: hold the frame for impact weight
     gameClock += sec;
     updateParticles(dt, sec); updateFloaters(dt, sec);
     if (shakeT > 0) shakeT -= sec;
+    if (flashT > 0) flashT -= sec;
+    if (comboTimer > 0) { comboTimer -= sec; if (comboTimer <= 0) combo = 0; }
 
+    if (state === "celebrate") {
+      celebrateT -= sec; waterScroll += 2.2 * dt;
+      if (celebrateT <= 0) { state = "levelComplete"; showLevelComplete(celebrateLevel); }
+      return;
+    }
     if (state !== "play") { waterScroll += 0.6 * dt; return; }
 
     const p = levelParams(level);
@@ -654,6 +680,7 @@
     }
     const scroll = p.scroll * (rapidsT > 0 ? settings.rapidsMultiplier : 1);
     waterScroll += scroll * dt;
+    for (let i = wake.length - 1; i >= 0; i--) { const n = wake[i]; n.y += scroll * dt; n.life -= sec; if (n.life <= 0) wake.splice(i, 1); }
 
     levelTime += sec;
     if (levelTime >= settings.levelDuration) { completeLevel(); return; }
@@ -681,6 +708,9 @@
     player.tilt = lerp(player.tilt, clamp(vx * 0.06, -0.35, 0.35), 0.2);
     paddleTimer -= sec;
     if (Math.abs(vx) > 1.5 && paddleTimer <= 0) { sPaddle(); paddleTimer = 0.18; }
+    wake.push({ x: player.x, y: player.y + settings.playerSize * 0.34, life: 0.5 });   // foamy trail behind the boat
+    if (wake.length > 28) wake.shift();
+    if (Math.abs(vx) > 2.2) burst(player.x + (vx > 0 ? 16 : -16), player.y + 4, "#eaf6ff", 1);   // bow spray
 
     // Jump (normal boats) or Dive (submarine)
     if (jumpQueued && player.special <= 0 && player.cd <= 0) {
@@ -688,9 +718,12 @@
       canDive ? sDive() : sJump();
     }
     jumpQueued = false;
+    const wasAir = player.airborne;
     if (player.special > 0) player.special -= sec;
     if (player.cd > 0) player.cd -= sec;
     player.airborne = player.special > 0;
+    if (wasAir && !player.airborne) { player.squashT = 0.16; burst(player.x, player.y + 6, "#dff4ff", 12); sSplash(); }   // landing thump
+    if (player.squashT > 0) player.squashT -= sec;
     const prog = player.airborne ? (1 - player.special / settings.jumpDuration) : 0;
     player.hop  = (player.airborne && !canDive) ? Math.sin(prog * Math.PI) : 0;
     player.sink = (player.airborne && canDive) ? Math.sin(prog * Math.PI) : 0;
@@ -715,7 +748,14 @@
       // hazards; underwater (submerged) hazards must always be steered around.
       const avoided = player.airborne && !o.type.submerged && (canDive || o.type.jumpable);
       if (!avoided && invincT <= 0 && circleHit(player.x, player.y, pr, o.x, o.y, o.type.r)) {
-        obstacles.splice(i, 1); damage();
+        obstacles.splice(i, 1); damage(); continue;
+      }
+      // near-miss: it slipped just past you — reward the dodge and feed the combo
+      if (!o.grazed && !avoided && o.y > player.y && Math.abs(o.x - player.x) < (pr + o.type.r) * 1.7) {
+        o.grazed = true; combo++; comboTimer = settings.comboWindow;
+        const pts = 5 * comboMult();
+        score += pts; floatText(o.x, o.y - 12, "✨ +" + pts, "#ffffff");
+        burst(o.x, o.y, "#ffffff", 6); sGraze(); buzz(8);
       }
     }
 
@@ -729,10 +769,13 @@
       if (c.y > H + c.size) { coins.splice(i, 1); continue; }
       if (circleHit(player.x, player.y, pr, c.x, c.y, c.r)) {
         coins.splice(i, 1);
-        score += c.value; save.wallet += c.coins;
-        floatText(c.x, c.y, "+" + c.value, c.gem ? "#9fe8ff" : "#ffe27a");
+        combo++; comboTimer = settings.comboWindow;
+        const m = comboMult(), pts = c.value * m;
+        score += pts; save.wallet += c.coins * m;
+        floatText(c.x, c.y, "+" + pts + (m > 1 ? " x" + m : ""), c.gem ? "#9fe8ff" : "#ffe27a");
         burst(c.x, c.y, c.gem ? "#9fe8ff" : "#ffe27a", c.gem ? 16 : 10);
-        c.gem ? sGem() : sCoin();
+        if (c.gem) { sGem(); freezeT = Math.max(freezeT, 0.035); } else sCoinCombo(combo);
+        buzz(c.gem ? 25 : 12);
         if (save.olive && Math.random() < 0.25) sBark();   // Olive cheers you on 🐶
       }
     }
@@ -771,7 +814,8 @@
     }
     ctx.globalAlpha = 1;
 
-    if (state === "play" || state === "levelComplete" || state === "dock") drawBoat();
+    drawWake();
+    if (state === "play" || state === "levelComplete" || state === "dock" || state === "celebrate") drawBoat();
 
     for (const f of floaters) {
       ctx.globalAlpha = clamp(f.life, 0, 1); ctx.fillStyle = f.color;
@@ -782,6 +826,43 @@
 
     if (state === "play" && rapidsT > 0) drawRapids();
     if (state === "play") drawHUD();
+    if (state === "celebrate") drawCelebrate();
+    if (flashT > 0) { ctx.globalAlpha = clamp(flashT / 0.25, 0, 1) * 0.5; ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+  }
+
+  // Pre-rendered soft "caustic" blob + scattered positions for the living-water surface.
+  const blobCanvas = document.createElement("canvas"); blobCanvas.width = blobCanvas.height = 64;
+  (function () {
+    const bx = blobCanvas.getContext("2d");
+    const g = bx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, "rgba(255,255,255,0.6)"); g.addColorStop(1, "rgba(255,255,255,0)");
+    bx.fillStyle = g; bx.beginPath(); bx.arc(32, 32, 32, 0, Math.PI * 2); bx.fill();
+  })();
+  const waterBlobs = [];
+  for (let i = 0; i < 22; i++) waterBlobs.push({ x: rand(CH_L, CH_R), y: rand(0, H), s: rand(0.5, 1.4), phase: rand(0, 6.28), spd: rand(0.5, 1.0) });
+
+  function drawWake() {
+    ctx.fillStyle = "#eaf6ff";
+    for (const n of wake) {
+      const t = clamp(n.life / 0.5, 0, 1);
+      ctx.globalAlpha = t * 0.4;
+      const w = 5 + (1 - t) * 9;
+      ctx.beginPath(); ctx.ellipse(n.x, n.y, w, 3 + (1 - t) * 2, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  function drawCelebrate() {
+    const p = 1 - celebrateT / settings.celebrateDuration;            // 0 -> 1
+    const pop = p < 0.3 ? p / 0.3 : 1;
+    const scale = pop < 1 ? 0.4 + pop : 1 + 0.08 * Math.sin(p * 12);   // slam in, then a little wobble
+    ctx.save();
+    ctx.translate(W / 2, H * 0.3); ctx.scale(scale, scale);
+    ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 8;
+    ctx.fillStyle = "#ffd76a"; ctx.font = "900 46px " + UI_FONT; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("LEVEL " + level, 0, -8);
+    ctx.fillStyle = "#fff"; ctx.font = "900 22px " + UI_FONT; ctx.fillText("LET'S GO!", 0, 28);
+    ctx.restore();
+    ctx.shadowBlur = 0; ctx.shadowColor = "transparent";
   }
 
   function drawRiver() {
@@ -809,9 +890,9 @@
       ctx.fillStyle = wx; ctx.fillRect(CH_L, 0, CH_R - CH_L, H);
     }
 
-    // Flowing ripples (clipped to the channel so they stay in the water).
+    // Living water: faint ripple lines + drifting caustic shimmer + a slow moving sun-glint.
     ctx.save(); ctx.beginPath(); ctx.rect(CH_L, 0, CH_R - CH_L, H); ctx.clip();
-    ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.lineWidth = 2;
     for (let i = 0; i < 16; i++) {
       const y = ((i * 50 + waterScroll) % (H + 50)) - 25;
       ctx.beginPath();
@@ -821,6 +902,17 @@
       }
       ctx.stroke();
     }
+    for (const b of waterBlobs) {                                   // shimmering caustics (cached sprite)
+      const y = ((b.y + waterScroll * b.spd) % (H + 80)) - 40;
+      ctx.globalAlpha = 0.05 + 0.06 * Math.abs(Math.sin(gameClock * 1.4 + b.phase));
+      const sz = 70 * b.s;
+      ctx.drawImage(blobCanvas, b.x - sz / 2, y - sz / 2, sz, sz);
+    }
+    ctx.globalAlpha = 1;
+    const gx = CH_L + (CH_R - CH_L) * (0.5 + 0.42 * Math.sin(gameClock * 0.28));   // slow sun-glint band
+    const gg = ctx.createLinearGradient(gx - 46, 0, gx + 46, 0);
+    gg.addColorStop(0, "rgba(255,255,255,0)"); gg.addColorStop(0.5, "rgba(255,255,255,0.1)"); gg.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = gg; ctx.fillRect(gx - 46, 0, 92, H);
     ctx.restore();
 
     if (!bgReady) paintForestEdges();         // sandy shore + scrolling pine trees
@@ -979,10 +1071,13 @@
     ctx.beginPath(); ctx.ellipse(player.x, player.y + 8, size * 0.32, size * 0.16, 0, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
 
+    const bob = Math.sin(gameClock * 2.5) * 1.3;                                    // gentle idle bob
+    const sq = player.squashT > 0 ? Math.sin((1 - player.squashT / 0.16) * Math.PI) * 0.18 : 0;   // landing squash
+    const bs = 1 + player.hop * 0.25 - player.sink * 0.3;
     ctx.save();
-    ctx.translate(player.x, player.y - lift);
-    ctx.rotate(player.tilt);
-    ctx.scale(1 + player.hop * 0.25 - player.sink * 0.3, 1 + player.hop * 0.25 - player.sink * 0.3);
+    ctx.translate(player.x, player.y - lift + bob);
+    ctx.rotate(player.tilt + Math.sin(gameClock * 1.7) * 0.02);
+    ctx.scale(bs * (1 + sq), bs * (1 - sq));
     let alpha = 1;
     if (player.sink > 0) alpha = 1 - player.sink * 0.45;
     if (invincT > 0) alpha *= 0.4 + 0.6 * Math.abs(Math.sin(gameClock * 20));
@@ -1099,6 +1194,13 @@
     ctx.fillText("Level " + level + "   🪙 " + save.wallet, 16, 58);
     ctx.textAlign = "right"; ctx.font = "20px " + EMOJI_FONT;
     ctx.fillText("❤️".repeat(Math.max(0, lives)), W - 12, 36);
+    const m = comboMult();
+    if (m > 1) {
+      const pulse = 1 + 0.12 * Math.abs(Math.sin(gameClock * 8));
+      ctx.save(); ctx.translate(W - 14, 62); ctx.scale(pulse, pulse);
+      ctx.fillStyle = "#ffd76a"; ctx.font = "900 18px " + UI_FONT; ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
+      ctx.fillText("COMBO x" + m, 0, 0); ctx.restore();
+    }
     ctx.shadowBlur = 0; ctx.shadowColor = "transparent";
   }
 
