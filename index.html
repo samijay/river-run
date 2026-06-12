@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-  <title>River Run</title>
+  <title>Road Trip River Run</title>
 
   <!-- Installable app (Add to Home Screen) + offline play -->
   <meta name="theme-color" content="#0e5a86" />
@@ -189,7 +189,7 @@
   </style>
 </head>
 <body>
-  <h1>🛶 River Run</h1>
+  <h1>🚗 Road Trip River Run</h1>
   <p class="byline">A game by <b>Ezra &amp; Eli Simon-Harris</b> · 🎮 E Brothers Gaming Corp.</p>
 
   <div id="stage">
@@ -211,8 +211,8 @@
   </div>
 
   <p class="hint">
-    Steer with the <b class="k">arrow keys</b>, the <b class="k">◀ ▶</b> buttons, or just
-    <b class="k">hold the mouse / your finger</b> on the river to glide there.
+    Steer with the <b class="k">arrow keys</b>, the <b class="k">◀ ▶</b> buttons, or
+    <b class="k">drag your finger</b> across the river.
     <b class="k">Space</b> / <b class="k">⤴ Jump</b> = jump. Grab coins 🪙, dodge the rocks!
   </p>
   <p class="tweak">
@@ -289,15 +289,15 @@
     soundOn: true,
   };
 
-  // ----- Changing lands: the river travels through a new look every few levels -----
+  // ----- Changing lands: road trip stops from SF Bay Area → Sunriver, OR -----
   const BIOME_EVERY = 3;        // switch scenery every N levels
   const BIOMES = [
-    { name: "Forest",        emoji: "🌲", waterTop: "#49a9c0", waterBottom: "#1d6699", bank: "#2f7d44", tint: null },
-    { name: "Sunset Canyon", emoji: "🌅", waterTop: "#f0a76a", waterBottom: "#b5572e", bank: "#8a4a2f", tint: "rgba(255,140,55,0.20)" },
-    { name: "Moonlit Night", emoji: "🌙", waterTop: "#3a5a8c", waterBottom: "#141d3a", bank: "#1c2540", tint: "rgba(18,22,60,0.44)" },
-    { name: "Snowy Pass",    emoji: "❄️", waterTop: "#a9d8e8", waterBottom: "#5a93b8", bank: "#d2e3ec", tint: "rgba(205,228,245,0.20)" },
-    { name: "Jungle",        emoji: "🌴", waterTop: "#3fc9a3", waterBottom: "#1c7d6a", bank: "#1f6e3a", tint: "rgba(35,175,120,0.16)" },
-    { name: "Crystal Cave",  emoji: "💎", waterTop: "#6a73c0", waterBottom: "#2a2160", bank: "#2c2748", tint: "rgba(78,38,140,0.38)" },
+    { name: "Bay Delta",        emoji: "🌉", waterTop: "#4db8d0", waterBottom: "#1a7a9a", bank: "#3a7a3a", tint: null },
+    { name: "Central Valley",   emoji: "🌾", waterTop: "#c8b86a", waterBottom: "#8a6a20", bank: "#8a7a30", tint: "rgba(200,170,60,0.14)" },
+    { name: "Mount Shasta",     emoji: "🏔️", waterTop: "#a9d8e8", waterBottom: "#5a93b8", bank: "#c0d8e0", tint: "rgba(180,210,230,0.18)" },
+    { name: "Shasta Lake",      emoji: "🏞️", waterTop: "#5ab8d8", waterBottom: "#1a5a90", bank: "#5a7a4a", tint: "rgba(20,80,160,0.12)" },
+    { name: "Klamath River",    emoji: "🌲", waterTop: "#3fa890", waterBottom: "#1d6a50", bank: "#2a5a30", tint: "rgba(20,80,40,0.14)" },
+    { name: "Deschutes River",  emoji: "☀️", waterTop: "#5ac9a0", waterBottom: "#1d8a60", bank: "#4a7a3a", tint: "rgba(255,220,60,0.10)" },
   ];
 
   // ----- Three ways to play (pick on the start screen) -----
@@ -396,7 +396,8 @@
   let jumpQueued = false;
   const keys = { left: false, right: false, up: false, down: false };
   let usePointer = false, paddleTimer = 0;
-  let pointerTarget = { x: W / 2, y: H - 130 };   // where a held mouse / finger is steering toward
+  let pointerTarget = { x: W / 2, y: H - 130 };   // where a dragged finger is steering toward
+  let pointerDownPos = null;                        // {x,y} of the raw clientX/Y where the drag started
 
 
   /* ============================================================
@@ -672,22 +673,37 @@
   function releaseAll() {                              // clear ALL movement (focus loss / restart)
     keys.left = keys.right = keys.up = keys.down = false;
     for (const k in heldBy) delete heldBy[k];
+    pointerDownPos = null; usePointer = false;
     ["leftBtn", "rightBtn"].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove("held"); });
   }
 
-  // Hold the mouse / finger anywhere on the river and the boat glides toward it.
+  // Drag your finger on the river to steer — a tap alone won't teleport the boat.
   function aimPointer(e) {
     if (anyDirKey()) return;                           // a held button / arrow wins over the pointer
     const pos = pointerPos(e); usePointer = true;
     pointerTarget.x = clamp(pos.x, CH_L + settings.playerSize * 0.5, CH_R - settings.playerSize * 0.5);
     pointerTarget.y = clamp(pos.y, H * 0.4, H - 40);
   }
-  canvas.addEventListener("pointermove", (e) => { if (state === "play") aimPointer(e); });
+  function endCanvasDrag(e) {
+    pointerDownPos = null; usePointer = false;
+    try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
+  }
+  canvas.addEventListener("pointermove", (e) => {
+    if (state !== "play" || !pointerDownPos) return;
+    // Require an 8-px drag before activating steering (prevents accidental tap-teleport)
+    const dx = e.clientX - pointerDownPos.x, dy = e.clientY - pointerDownPos.y;
+    if (!usePointer && dx * dx + dy * dy < 64) return;
+    aimPointer(e);
+  });
   canvas.addEventListener("pointerdown", (e) => {
     ensureAudio();
-    if (state === "play") { aimPointer(e); try { canvas.setPointerCapture(e.pointerId); } catch (err) {} }
+    if (state === "play") {
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    }
   });
-  canvas.addEventListener("pointerup", (e) => { try { canvas.releasePointerCapture(e.pointerId); } catch (err) {} });
+  canvas.addEventListener("pointerup",     (e) => { endCanvasDrag(e); });
+  canvas.addEventListener("pointercancel", (e) => { endCanvasDrag(e); });
 
   document.getElementById("muteBtn").addEventListener("click", () => { ensureAudio(); toggleMute(); });
   document.getElementById("jumpBtn").addEventListener("pointerdown", (e) => { e.preventDefault(); ensureAudio(); if (state === "play") jumpQueued = true; });
@@ -1229,26 +1245,8 @@
     ctx.fillStyle = "#d9a91f"; roundRect(-size * 0.12, -size * 0.4, size * 0.24, size * 0.2, 4); ctx.fill();       // conning tower
     ctx.fillStyle = "#bfe3ff"; ctx.beginPath(); ctx.arc(size * 0.16, 0, size * 0.12, 0, Math.PI * 2); ctx.fill();  // porthole
   }
-  // Olive the cavapoo 🐶 — a BLACK cavapoo with a white spot under her chin. Joins after Level 7.
-  function drawOlive(x, y, s) {
-    ctx.save(); ctx.translate(x, y);
-    const black = "#2c2a2b", blackD = "#1b1a1b", white = "#f4f1ea", nose = "#565457", shine = "#ffffff";
-    ctx.fillStyle = black; ctx.beginPath(); ctx.ellipse(0, s * 0.2, s * 0.34, s * 0.27, 0, 0, Math.PI * 2); ctx.fill();          // body
-    ctx.fillStyle = blackD;                                                                                                      // floppy ears
-    ctx.beginPath(); ctx.ellipse(-s * 0.27, -s * 0.04, s * 0.13, s * 0.21, 0.4, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(s * 0.27, -s * 0.04, s * 0.13, s * 0.21, -0.4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = black; ctx.beginPath(); ctx.arc(0, -s * 0.12, s * 0.3, 0, Math.PI * 2); ctx.fill();                          // head
-    ctx.fillStyle = white; ctx.beginPath(); ctx.ellipse(0, s * 0.16, s * 0.11, s * 0.12, 0, 0, Math.PI * 2); ctx.fill();         // white spot UNDER the chin (on top of head/chest)
-    ctx.fillStyle = "#0d0c0d";                                                                                                   // eyes
-    ctx.beginPath(); ctx.arc(-s * 0.1, -s * 0.15, s * 0.06, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(s * 0.1, -s * 0.15, s * 0.06, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = shine;                                                                                                       // eye glints (so eyes read on black)
-    ctx.beginPath(); ctx.arc(-s * 0.08, -s * 0.17, s * 0.022, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(s * 0.12, -s * 0.17, s * 0.022, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = nose; ctx.beginPath(); ctx.arc(0, -s * 0.03, s * 0.055, 0, Math.PI * 2); ctx.fill();                         // nose
-    ctx.fillStyle = "#ff8fa3"; ctx.beginPath(); ctx.ellipse(0, s * 0.05, s * 0.04, s * 0.05, 0, 0, Math.PI * 2); ctx.fill();     // tongue
-    ctx.restore();
-  }
+  // Olive the cavapoo 🐶 — mostly black, white chin + bib. Joins after Level 7 (Mt. Shasta rest stop).
+  function drawOlive(x, y, s) { drawOliveCtx(ctx, x, y, s); }
   // A friendly river otter 🦦 — swims alongside the boat after Level 5.
   function drawOtter(x, y, s) {
     ctx.save(); ctx.translate(x, y);
@@ -1360,6 +1358,29 @@
     });
   }
 
+  // Draw Olive the cavapoo onto a given 2D context — used on the splash mini-canvas.
+  function drawOliveCtx(ox, cx, cy, s) {
+    ox.save(); ox.translate(cx, cy);
+    const black = "#2c2a2b", blackD = "#1b1a1b", white = "#f4f1ea", nose = "#565457", shine = "#ffffff";
+    ox.fillStyle = black; ox.beginPath(); ox.ellipse(0, s*0.2, s*0.34, s*0.27, 0, 0, Math.PI*2); ox.fill();
+    ox.fillStyle = blackD;
+    ox.beginPath(); ox.ellipse(-s*0.27, -s*0.04, s*0.13, s*0.21, 0.4, 0, Math.PI*2); ox.fill();
+    ox.beginPath(); ox.ellipse(s*0.27, -s*0.04, s*0.13, s*0.21, -0.4, 0, Math.PI*2); ox.fill();
+    ox.fillStyle = black; ox.beginPath(); ox.arc(0, -s*0.12, s*0.3, 0, Math.PI*2); ox.fill();
+    ox.fillStyle = white;
+    ox.beginPath(); ox.ellipse(0, s*0.07, s*0.14, s*0.1, 0, 0, Math.PI*2); ox.fill();
+    ox.beginPath(); ox.ellipse(0, s*0.22, s*0.18, s*0.13, 0, 0, Math.PI*2); ox.fill();
+    ox.fillStyle = "#0d0c0d";
+    ox.beginPath(); ox.arc(-s*0.1, -s*0.15, s*0.06, 0, Math.PI*2); ox.fill();
+    ox.beginPath(); ox.arc(s*0.1, -s*0.15, s*0.06, 0, Math.PI*2); ox.fill();
+    ox.fillStyle = shine;
+    ox.beginPath(); ox.arc(-s*0.08, -s*0.17, s*0.022, 0, Math.PI*2); ox.fill();
+    ox.beginPath(); ox.arc(s*0.12, -s*0.17, s*0.022, 0, Math.PI*2); ox.fill();
+    ox.fillStyle = nose; ox.beginPath(); ox.arc(0, -s*0.03, s*0.055, 0, Math.PI*2); ox.fill();
+    ox.fillStyle = "#ff8fa3"; ox.beginPath(); ox.ellipse(0, s*0.05, s*0.04, s*0.05, 0, 0, Math.PI*2); ox.fill();
+    ox.restore();
+  }
+
   function showSplash() {
     state = "splash";
     const word = "E BROTHERS";
@@ -1373,9 +1394,18 @@
       <div class="pres">presents</div>
       <div class="logo">${letters}</div>
       <div class="corp">GAMING CORP.</div>
-      <div class="crew"><span class="b">🛶</span> <span class="b2">🐶</span></div>
+      <div style="font-size:12px;color:#a8d8ff;animation:fadeUp .5s ease backwards .9s;margin:-2px 0 4px;letter-spacing:1px;">🚗 Bay Area → Sunriver, OR</div>
+      <div class="crew"><span class="b">🛶</span> <canvas id="oliveSplash" width="80" height="80" style="width:50px;height:50px;display:inline-block;vertical-align:middle;" class="b2"></canvas></div>
       <div class="tap">tap to start</div>`;
     splash.style.display = "flex";
+    // Draw Olive on the mini canvas inside the splash
+    const oc = document.getElementById("oliveSplash");
+    if (oc) {
+      const ox = oc.getContext("2d");
+      ox.fillStyle = "rgba(50,130,190,0.18)";
+      ox.beginPath(); ox.arc(40, 40, 36, 0, Math.PI * 2); ox.fill();   // subtle halo so black dog reads on dark bg
+      drawOliveCtx(ox, 40, 40, 30);
+    }
     let done = false;
     const go = () => {
       if (done) return; done = true;
@@ -1395,11 +1425,12 @@
   function showHowTo() {
     state = "howto";
     showOverlay(`<h2>How to play 🛶</h2>
-      <p style="text-align:left">⬅️ ➡️ <b>Steer</b> with the arrow keys, the ◀ ▶ buttons, or hold your finger on the river.</p>
+      <p style="text-align:left">🚗 The family's road-tripping from the <b>SF Bay Area to Sunriver, OR</b> — stopping to run every river along the way!</p>
+      <p style="text-align:left">⬅️ ➡️ <b>Steer</b> with the arrow keys, the ◀ ▶ buttons, or <b>drag your finger</b> across the river.</p>
       <p style="text-align:left">⤴ <b>Jump</b> (Space / Jump button) hops over 🪨 rocks, logs &amp; sticks.</p>
       <p style="text-align:left">🪙 <b>Grab coins</b> to fill your shop budget — 💎 gems are worth more!</p>
       <p style="text-align:left">🐟 🚣 <b>Dodge</b> fish &amp; boats — you can't jump those. ❤️ are your lives.</p>
-      <p style="text-align:left">⭐ Survive ${settings.levelDuration}s to <b>level up</b> — and the river travels through new lands as you go! 🌅🌙❄️</p>
+      <p style="text-align:left">⭐ Survive ${settings.levelDuration}s to <b>level up</b> — the scenery changes as the trip rolls north: 🌉 Bay Delta → 🌾 Central Valley → 🏔️ Mt. Shasta → 🏞️ Shasta Lake → 🌲 Klamath River → ☀️ Sunriver!</p>
       <button id="howGo" class="primary">Let's go! ▶</button>`);
     document.getElementById("howGo").onclick = () => { try { localStorage.setItem("riverRunSeenHow", "1"); } catch (e) {} ensureAudio(); showSelect(); };
   }
@@ -1407,8 +1438,9 @@
   function showSelect() {
     state = "select";
     showOverlay(`
-      <h2>🛶 River Run</h2>
-      <p>Budget: 🪙 <b>${save.wallet}</b></p>
+      <h2>🚗 Road Trip River Run</h2>
+      <p style="color:#9fd0ff;font-size:13px;margin:-2px 0 6px;">Bay Area → Sunriver, OR 🏕️</p>
+      <p>Coins: 🪙 <b>${save.wallet}</b></p>
       <h3>Difficulty</h3>
       <div class="diffs">
         ${Object.keys(DIFFICULTIES).map(k => `<button class="diff-btn ${save.difficulty === k ? "sel" : ""}" data-diff="${k}">${DIFFICULTIES[k].label}</button>`).join("")}
@@ -1465,11 +1497,25 @@
     };
   }
 
+  const TRIP_NARRATIVE = [
+    "The Sacramento-San Joaquin Delta is wild — stay on course! 🌊",
+    "Blazing through the Central Valley heat — the river's picking up speed! ☀️",
+    "Mt. Shasta in the windshield — the McCloud River is ice-cold and rushing! 🏔️",
+    "Shasta Lake — biggest reservoir in California, and the current underneath is wild! 🏞️",
+    "The Klamath River cuts through the Siskiyous — raw and fast! 🌲",
+    "Final stretch on the Deschutes — Sunriver straight ahead! 🎉",
+  ];
+  function tripNarrative(lvl) {
+    return TRIP_NARRATIVE[Math.min(Math.floor((Math.max(1, lvl) - 1) / BIOME_EVERY), TRIP_NARRATIVE.length - 1)];
+  }
+
   function showLevelComplete(completed) {
-    let html = `<h2>Level ${completed} complete! 🎉</h2><p>Score: <b>${Math.floor(score)}</b> · Budget: <b>${save.wallet} 🪙</b></p>`;
+    let html = `<h2>Level ${completed} complete! 🎉</h2>`;
+    html += `<p style="color:#9fd0ff;font-size:13px;">${tripNarrative(completed)}</p>`;
+    html += `<p>Score: <b>${Math.floor(score)}</b> · Coins: <b>${save.wallet} 🪙</b></p>`;
     if (level % settings.checkpointEvery === 0) html += `<p>⛳ <b>Checkpoint reached — Level ${level}!</b></p>`;
-    if (otterJustJoined) html += `<p style="font-size:15px;background:#16513c;border-radius:10px;padding:9px 11px;">🦦 <b>Surprise! A friendly river otter joined your crew — and gave you an extra life ❤️!</b> She swims alongside you from now on. 🎉</p>`;
-    if (oliveJustJoined) html += `<p style="font-size:15px;background:#16513c;border-radius:10px;padding:9px 11px;">🐶 <b>Surprise! Olive the Cavapoo hopped aboard your boat!</b> She rides with you from now on. 🎉</p>`;
+    if (otterJustJoined) html += `<p style="font-size:15px;background:#16513c;border-radius:10px;padding:9px 11px;">🦦 <b>Surprise! A Klamath River otter decided this road trip looked fun — and gave you an extra ❤️!</b> She swims alongside from now on. 🎉</p>`;
+    if (oliveJustJoined) html += `<p style="font-size:15px;background:#16513c;border-radius:10px;padding:9px 11px;">🐶 <b>Surprise! Olive spotted the family's car at a Mt. Shasta rest stop and leaped in!</b> She's coming all the way to Sunriver and riding along on the boat. 🎉</p>`;
     if (completed === 1) {
       const pref = escapeHtml(playerName || save.lastName || "");
       html += `<p>For the leaderboard — who's playing? Keep the name or type a new one (a different player can take over), then Save. Optional.</p>
@@ -1495,9 +1541,12 @@
   function showGameOver() {
     const hasScore = Math.floor(score) > 0;
     const who = playerName || save.lastName || "";
-    const cheer = level >= 8 ? "Amazing run" : level >= 5 ? "Great paddling" : level >= 3 ? "Nice run" : "Good try";
+    const cheer = level >= 8 ? "Epic road trip" : level >= 5 ? "Great run" : level >= 3 ? "Nice paddle" : "Good start";
     const meters = Math.floor(distance / 8);
-    let html = `<h2>${cheer}${who ? ", " + escapeHtml(who) : ""}! 🌟</h2><p>You reached <b>Level ${level}</b>, traveled <b>${meters}m</b>, and scored <b>${Math.floor(score)}</b> ⭐ · 🪙 ${save.wallet}</p>`;
+    const leg = TRIP_NARRATIVE[Math.min(Math.floor((Math.max(1, level) - 1) / BIOME_EVERY), TRIP_NARRATIVE.length - 1)];
+    let html = `<h2>${cheer}${who ? ", " + escapeHtml(who) : ""}! 🌟</h2>`;
+    html += `<p style="color:#9fd0ff;font-size:13px;">The family made it to <b>${BIOMES[biomeForLevel(level)].emoji} ${BIOMES[biomeForLevel(level)].name}</b></p>`;
+    html += `<p>Level <b>${level}</b> · <b>${meters}m</b> paddled · <b>${Math.floor(score)}</b> ⭐ · 🪙 ${save.wallet} for the road</p>`;
     if (checkpointLevel >= settings.checkpointEvery)
       html += `<div class="row"><button id="cont" class="primary">▶ Continue from Level ${checkpointLevel}</button></div>`;
     if (hasScore) {

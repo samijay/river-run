@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "river-run",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "4321", "--directory", "/Users/jmw/Documents/Claude Projects/river-run"],
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-l", "4321", "/Users/jmw/Documents/Claude Projects/river-run"],
       "port": 4321
     }
   ]
