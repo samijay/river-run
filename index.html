@@ -3,7 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-  <title>River Run</title>
+  <title>Road Trip River Run</title>
+
+  <!-- Installable app (Add to Home Screen) + offline play -->
+  <meta name="theme-color" content="#0e5a86" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="assets/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="River Run" />
 
   <!--
     ============================================================
@@ -65,6 +73,10 @@
     .muted { color: #7f9bb5; }
 
     .boats { display: flex; gap: 10px; justify-content: center; margin: 10px 0; }
+    .diffs { display: flex; gap: 8px; justify-content: center; margin: 6px 0 2px; }
+    .diff-btn { flex: 1; background: #14334c; color: #eaf4ff; border: 2px solid #2b5a80; border-radius: 12px; padding: 9px 6px; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .diff-btn.sel { border-color: #2fd29a; background: #16513c; }
+    .diff-btn:hover { border-color: #5fb0ff; }
     .boat-btn {
       flex: 1; background: #14334c; color: #eaf4ff; border: 2px solid #2b5a80;
       border-radius: 14px; padding: 12px 8px; font-size: 15px; font-weight: 700; cursor: pointer;
@@ -117,7 +129,7 @@
     ol.board li.me { background: #1f8f6b; }
     ol.board li.me em, ol.board li.me b { color: #fff; }
 
-    .controls { display: flex; gap: 10px; width: min(94vw, 46dvh); justify-content: space-between; }
+    .controls { display: flex; flex-wrap: wrap; gap: 10px; width: min(94vw, 520px); justify-content: center; margin: 0 auto; }
     .cgroup { display: flex; gap: 8px; }
     .controls button {
       background: #14334c; color: #eaf4ff; border: 2px solid #2b5a80;
@@ -136,6 +148,9 @@
       h1 { font-size: 21px; }
       .byline { font-size: 11px; }
       p.hint, p.tweak { display: none; }
+      .controls { gap: 8px; }
+      .controls button { padding: 10px 13px; font-size: 15px; }
+      .dirbtn { min-width: 54px; padding: 10px 14px; }
     }
 
     /* ---- Cartoony E Brothers Gaming Corp. splash ---- */
@@ -174,7 +189,7 @@
   </style>
 </head>
 <body>
-  <h1>🛶 River Run</h1>
+  <h1>🚗 Road Trip River Run</h1>
   <p class="byline">A game by <b>Ezra &amp; Eli Simon-Harris</b> · 🎮 E Brothers Gaming Corp.</p>
 
   <div id="stage">
@@ -190,13 +205,14 @@
     </div>
     <div class="cgroup">
       <button id="muteBtn" title="Sound on/off">🔊</button>
+      <button id="pauseBtn" title="Pause (P)">⏸</button>
       <button id="jumpBtn" title="Jump / Dive">⤴ Jump</button>
     </div>
   </div>
 
   <p class="hint">
-    Steer with the <b class="k">arrow keys</b>, the <b class="k">◀ ▶</b> buttons, or just
-    <b class="k">hold the mouse / your finger</b> on the river to glide there.
+    Steer with the <b class="k">arrow keys</b>, the <b class="k">◀ ▶</b> buttons, or
+    <b class="k">drag your finger</b> across the river.
     <b class="k">Space</b> / <b class="k">⤴ Jump</b> = jump. Grab coins 🪙, dodge the rocks!
   </p>
   <p class="tweak">
@@ -273,6 +289,24 @@
     soundOn: true,
   };
 
+  // ----- Changing lands: road trip stops from SF Bay Area → Sunriver, OR -----
+  const BIOME_EVERY = 3;        // switch scenery every N levels
+  const BIOMES = [
+    { name: "Bay Delta",        emoji: "🌉", waterTop: "#4db8d0", waterBottom: "#1a7a9a", bank: "#3a7a3a", tint: null },
+    { name: "Central Valley",   emoji: "🌾", waterTop: "#c8b86a", waterBottom: "#8a6a20", bank: "#8a7a30", tint: "rgba(200,170,60,0.14)" },
+    { name: "Mount Shasta",     emoji: "🏔️", waterTop: "#a9d8e8", waterBottom: "#5a93b8", bank: "#c0d8e0", tint: "rgba(180,210,230,0.18)" },
+    { name: "Shasta Lake",      emoji: "🏞️", waterTop: "#5ab8d8", waterBottom: "#1a5a90", bank: "#5a7a4a", tint: "rgba(20,80,160,0.12)" },
+    { name: "Klamath River",    emoji: "🌲", waterTop: "#3fa890", waterBottom: "#1d6a50", bank: "#2a5a30", tint: "rgba(20,80,40,0.14)" },
+    { name: "Deschutes River",  emoji: "☀️", waterTop: "#5ac9a0", waterBottom: "#1d8a60", bank: "#4a7a3a", tint: "rgba(255,220,60,0.10)" },
+  ];
+
+  // ----- Three ways to play (pick on the start screen) -----
+  const DIFFICULTIES = {
+    easy:   { label: "Easy 🐣",   lives: 2, scrollMul: 0.78, gapMul: 1.4,  hint: "more lives, calmer river" },
+    normal: { label: "Normal 🛶", lives: 0, scrollMul: 1.0,  gapMul: 1.0,  hint: "the classic run" },
+    bold:   { label: "Bold 🔥",   lives: 0, scrollMul: 1.18, gapMul: 0.78, hint: "faster water, more hazards" },
+  };
+
   // Boats unlock every 3 levels. handling = how nimble. canDive = it's a submarine.
   const BOATS = {
     canoe:     { emoji: "🛶", name: "Canoe",      handling: 1.0,  unlockLevel: 1 },
@@ -320,6 +354,7 @@
       lastName: typeof s.lastName === "string" ? s.lastName : "",
       olive: !!s.olive,            // Olive the cavapoo joins after Level 7 (and stays!)
       otter: !!s.otter,            // a river otter joins after Level 5 (grants an extra life!)
+      difficulty: (s.difficulty === "easy" || s.difficulty === "bold") ? s.difficulty : "normal",
     };
   }
   function persist() { try { localStorage.setItem("riverRunSave", JSON.stringify(save)); } catch (e) {} }
@@ -351,6 +386,8 @@
   let freezeT = 0, flashT = 0;              // hit-stop freeze-frame + screen flash
   let celebrateT = 0, celebrateLevel = 0;   // the level-up celebration beat
   let wake = [];                            // foamy boat-wake trail
+  let distance = 0;                         // meters traveled (the odometer)
+  let biomeIdx = 0, biomePrevIdx = 0, biomeFade = 0, biomeAnnounceT = 0, biomeNew = false;   // changing-lands crossfade + banner
 
   const player = {
     x: W / 2, y: H - 130, prevX: W / 2,
@@ -359,7 +396,8 @@
   let jumpQueued = false;
   const keys = { left: false, right: false, up: false, down: false };
   let usePointer = false, paddleTimer = 0;
-  let pointerTarget = { x: W / 2, y: H - 130 };   // where a held mouse / finger is steering toward
+  let pointerTarget = { x: W / 2, y: H - 130 };   // where a dragged finger is steering toward
+  let pointerDownPos = null;                        // {x,y} of the raw clientX/Y where the drag started
 
 
   /* ============================================================
@@ -370,6 +408,14 @@
   const lerp = (a, b, t) => a + (b - a) * t;
   const pick = (list) => list[Math.floor(Math.random() * list.length)];
   const hexA = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; };
+  const lerpHex = (a, b, t) => { const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16);
+    const r = Math.round(((A >> 16) & 255) + (((B >> 16) & 255) - ((A >> 16) & 255)) * t);
+    const g = Math.round(((A >> 8) & 255) + (((B >> 8) & 255) - ((A >> 8) & 255)) * t);
+    const bl = Math.round((A & 255) + ((B & 255) - (A & 255)) * t);
+    return `rgb(${r},${g},${bl})`; };
+  const rgbaOf = (c, a) => c[0] === "#" ? hexA(c, a) : c.replace("rgb(", "rgba(").replace(")", "," + a + ")");
+  const biomeForLevel = (lvl) => ((Math.floor((Math.max(1, lvl) - 1) / BIOME_EVERY) % BIOMES.length) + BIOMES.length) % BIOMES.length;
+  const diff = () => DIFFICULTIES[save.difficulty] || DIFFICULTIES.normal;
   function comboMult() { return Math.min(1 + Math.floor(combo / 3), 5); }   // x1 .. x5 as the streak grows
   function circleHit(ax, ay, ar, bx, by, br) {
     const dx = ax - bx, dy = ay - by; return dx * dx + dy * dy < (ar + br) * (ar + br);
@@ -464,9 +510,10 @@
      SECTION 6 — Difficulty per level
      ============================================================ */
   function levelParams(lvl) {
+    const d = diff();
     return {
-      scroll: Math.min(settings.baseScroll + (lvl - 1) * settings.scrollPerLevel, settings.maxScroll),
-      obstacleEvery: Math.max(settings.minObstacleEvery, settings.baseObstacleEvery - (lvl - 1) * 0.14),
+      scroll: Math.min(settings.baseScroll + (lvl - 1) * settings.scrollPerLevel, settings.maxScroll) * d.scrollMul,
+      obstacleEvery: Math.max(settings.minObstacleEvery, settings.baseObstacleEvery - (lvl - 1) * 0.14) * d.gapMul,
       coinEvery: Math.max(settings.minCoinEvery, settings.baseCoinEvery - (lvl - 1) * 0.09),
       types: OBSTACLES.filter(t => lvl >= t.minLevel),
       gemChance: lvl >= 3 ? Math.min(0.12 + (lvl - 3) * 0.05, 0.45) : 0,
@@ -511,7 +558,7 @@
      SECTION 8 — Start / level-up / damage / checkpoints
      ============================================================ */
   function applyUpgradesToRun() {
-    lives = settings.lives + (save.upgrades.extraLife ? 1 : 0) + (save.otter ? 1 : 0);  // otter = +1 life
+    lives = settings.lives + diff().lives + (save.upgrades.extraLife ? 1 : 0) + (save.otter ? 1 : 0);  // difficulty + otter
     player.shield = !!save.upgrades.shield;
   }
   function primeTimers() {
@@ -528,9 +575,10 @@
   }
 
   function startGame() {
-    level = 1; levelTime = 0; score = 0; checkpointLevel = 0; checkpointScore = 0;
+    level = 1; levelTime = 0; score = 0; distance = 0; checkpointLevel = 0; checkpointScore = 0;
     obstacles = []; coins = []; particles = []; floaters = []; wake = [];
     combo = 0; comboTimer = 0; freezeT = 0; flashT = 0;
+    biomeIdx = biomeForLevel(1); biomePrevIdx = biomeIdx; biomeFade = 0; biomeAnnounceT = 0; biomeNew = false;
     applyUpgradesToRun(); resetPlayerPos(); primeTimers();
     state = "play";
   }
@@ -538,6 +586,8 @@
   function completeLevel() {
     const completed = level;
     level++; levelTime = 0; obstacles = []; coins = [];
+    const nb = biomeForLevel(level);
+    if (nb !== biomeIdx) { biomePrevIdx = biomeIdx; biomeIdx = nb; biomeFade = 1; biomeNew = true; }   // entered a new land! (announced on resume)
     newlyUnlocked = null;
     for (const key in BOATS)
       if (BOATS[key].unlockLevel === level && !save.ownedBoats.includes(key)) { save.ownedBoats.push(key); newlyUnlocked = key; }
@@ -555,13 +605,26 @@
 
   function resumeNextLevel() {
     if (save.upgrades.shield) player.shield = true;   // a fresh shield each level
+    if (biomeNew) { biomeAnnounceT = 2.6; biomeFade = 1; biomeNew = false; }   // reveal the new land now you're back on the river
     resetPlayerPos(); primeTimers(); hideOverlay(); state = "play";
   }
+
+  function pauseGame() {
+    if (state !== "play") return;
+    state = "paused"; releaseAll(); usePointer = false;
+    showOverlay(`<h2>⏸ Paused</h2><p class="muted">Take a breather — your run is waiting.</p>
+      <div class="row"><button id="resumeBtn" class="primary">▶ Resume</button></div>
+      <div class="row"><button id="quitBtn" class="secondary">Quit to menu</button></div>`);
+    document.getElementById("resumeBtn").onclick = () => resumeGame();
+    document.getElementById("quitBtn").onclick = () => { hideOverlay(); showSelect(); };
+  }
+  function resumeGame() { if (state === "paused") { hideOverlay(); state = "play"; } }
 
   function continueFromCheckpoint() {
     level = checkpointLevel; score = checkpointScore; levelTime = 0;
     obstacles = []; coins = []; particles = []; floaters = []; wake = [];
     combo = 0; comboTimer = 0; freezeT = 0; flashT = 0;
+    biomeIdx = biomeForLevel(level); biomePrevIdx = biomeIdx; biomeFade = 0; biomeAnnounceT = 0; biomeNew = false;
     applyUpgradesToRun(); resetPlayerPos(); primeTimers(); hideOverlay(); state = "play";
   }
 
@@ -610,25 +673,43 @@
   function releaseAll() {                              // clear ALL movement (focus loss / restart)
     keys.left = keys.right = keys.up = keys.down = false;
     for (const k in heldBy) delete heldBy[k];
+    pointerDownPos = null; usePointer = false;
     ["leftBtn", "rightBtn"].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove("held"); });
   }
 
-  // Hold the mouse / finger anywhere on the river and the boat glides toward it.
+  // Drag your finger on the river to steer — a tap alone won't teleport the boat.
   function aimPointer(e) {
     if (anyDirKey()) return;                           // a held button / arrow wins over the pointer
     const pos = pointerPos(e); usePointer = true;
     pointerTarget.x = clamp(pos.x, CH_L + settings.playerSize * 0.5, CH_R - settings.playerSize * 0.5);
     pointerTarget.y = clamp(pos.y, H * 0.4, H - 40);
   }
-  canvas.addEventListener("pointermove", (e) => { if (state === "play") aimPointer(e); });
+  function endCanvasDrag(e) {
+    pointerDownPos = null; usePointer = false;
+    try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
+  }
+  canvas.addEventListener("pointermove", (e) => {
+    if (state !== "play" || !pointerDownPos) return;
+    // Require an 8-px drag before activating steering (prevents accidental tap-teleport)
+    const dx = e.clientX - pointerDownPos.x, dy = e.clientY - pointerDownPos.y;
+    if (!usePointer && dx * dx + dy * dy < 64) return;
+    aimPointer(e);
+  });
   canvas.addEventListener("pointerdown", (e) => {
     ensureAudio();
-    if (state === "play") { aimPointer(e); try { canvas.setPointerCapture(e.pointerId); } catch (err) {} }
+    if (state === "play") {
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    }
   });
-  canvas.addEventListener("pointerup", (e) => { try { canvas.releasePointerCapture(e.pointerId); } catch (err) {} });
+  canvas.addEventListener("pointerup",     (e) => { endCanvasDrag(e); });
+  canvas.addEventListener("pointercancel", (e) => { endCanvasDrag(e); });
 
   document.getElementById("muteBtn").addEventListener("click", () => { ensureAudio(); toggleMute(); });
   document.getElementById("jumpBtn").addEventListener("pointerdown", (e) => { e.preventDefault(); ensureAudio(); if (state === "play") jumpQueued = true; });
+  document.getElementById("pauseBtn").addEventListener("click", () => { if (state === "play") pauseGame(); else if (state === "paused") resumeGame(); });
+  window.addEventListener("keydown", (e) => { if (e.key === "Escape" || e.key === "p" || e.key === "P") { if (state === "play") pauseGame(); else if (state === "paused") resumeGame(); } });
+  document.addEventListener("visibilitychange", () => { if (document.hidden && state === "play") pauseGame(); });   // auto-pause on tab/app switch
 
   // On-screen thumb steering — press and HOLD to move (each tracked by its own pointer id).
   function holdBtn(id, key) {
@@ -662,7 +743,9 @@
     updateParticles(dt, sec); updateFloaters(dt, sec);
     if (shakeT > 0) shakeT -= sec;
     if (flashT > 0) flashT -= sec;
-    if (comboTimer > 0) { comboTimer -= sec; if (comboTimer <= 0) combo = 0; }
+    if (biomeFade > 0) biomeFade = Math.max(0, biomeFade - sec / 1.2);   // ~1.2s crossfade into a new land
+    if (biomeAnnounceT > 0) biomeAnnounceT -= sec;
+    if (state === "play" && comboTimer > 0) { comboTimer -= sec; if (comboTimer <= 0) combo = 0; }   // streak holds while paused
 
     if (state === "celebrate") {
       celebrateT -= sec; waterScroll += 2.2 * dt;
@@ -680,7 +763,7 @@
       else { rapidsCD -= sec; if (rapidsCD <= 0) { rapidsT = settings.rapidsDuration; sRapids(); } }
     }
     const scroll = p.scroll * (rapidsT > 0 ? settings.rapidsMultiplier : 1);
-    waterScroll += scroll * dt;
+    waterScroll += scroll * dt; distance += scroll * dt;
     for (let i = wake.length - 1; i >= 0; i--) { const n = wake[i]; n.y += scroll * dt; n.life -= sec; if (n.life <= 0) wake.splice(i, 1); }
 
     levelTime += sec;
@@ -828,6 +911,7 @@
     if (state === "play" && rapidsT > 0) drawRapids();
     if (state === "play") drawHUD();
     if (state === "celebrate") drawCelebrate();
+    if (biomeAnnounceT > 0 && (state === "play" || state === "celebrate")) drawBiomeBanner();
     if (flashT > 0) { ctx.globalAlpha = clamp(flashT / 0.25, 0, 1) * 0.5; ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
   }
 
@@ -867,29 +951,49 @@
     ctx.restore();
     ctx.shadowBlur = 0; ctx.shadowColor = "transparent";
   }
+  function drawBiomeBanner() {   // "🌅 Sunset Canyon" appears for a moment when you enter a new land
+    const t = biomeAnnounceT, bm = BIOMES[biomeIdx];
+    const a = t > 2.1 ? (2.6 - t) / 0.5 : (t < 0.6 ? t / 0.6 : 1);   // fade in, hold, fade out
+    ctx.save(); ctx.globalAlpha = clamp(a, 0, 1);
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = "900 21px " + UI_FONT;
+    const label = bm.emoji + "  " + bm.name, w = ctx.measureText(label).width + 40;
+    ctx.fillStyle = "rgba(8,18,30,0.66)"; roundRect(W / 2 - w / 2, H * 0.135 - 21, w, 42, 14); ctx.fill();
+    ctx.fillStyle = "#ffd76a"; ctx.fillText(label, W / 2, H * 0.135);
+    ctx.restore();
+  }
 
+  function drawTint(tint, alpha) {   // wash the whole scene with a biome mood color
+    if (!tint || alpha <= 0) return;
+    ctx.save(); ctx.globalAlpha = Math.min(1, alpha); ctx.fillStyle = tint; ctx.fillRect(0, 0, W, H); ctx.restore();
+  }
   function drawRiver() {
-    // Backdrop: your photo if present, otherwise painted forest banks.
+    // Which "land" are we in? Crossfade colors when we enter a new one.
+    const cur = BIOMES[biomeIdx], prev = BIOMES[biomePrevIdx], ft = biomeFade > 0 ? 1 - biomeFade : 1;
+    const wTop = biomeFade > 0 ? lerpHex(prev.waterTop, cur.waterTop, ft) : cur.waterTop;
+    const wBot = biomeFade > 0 ? lerpHex(prev.waterBottom, cur.waterBottom, ft) : cur.waterBottom;
+    const bankC = biomeFade > 0 ? lerpHex(prev.bank, cur.bank, ft) : cur.bank;
+
+    // Backdrop: your photo if present, otherwise painted banks (recolored per land).
     if (bgReady) {
       const s = Math.max(W / bgImage.width, H / bgImage.height);
       const iw = bgImage.width * s, ih = bgImage.height * s;
       ctx.drawImage(bgImage, (W - iw) / 2, (H - ih) / 2, iw, ih);
     } else {
-      ctx.fillStyle = settings.bankColor;
+      ctx.fillStyle = bankC;
       ctx.fillRect(0, 0, BANK, H); ctx.fillRect(W - BANK, 0, BANK, H);
     }
 
     // A STRAIGHT water channel down the middle. Over the photo it feathers to transparent at
     // the edges so it blends into the banks (no hard seam); the painted mode stays solid.
     if (bgReady) {
-      const t = settings.waterTop, d = settings.waterBottom, op = settings.bgChannelOpacity, wx = ctx.createLinearGradient(CH_L, 0, CH_R, 0);
-      wx.addColorStop(0, hexA(t, 0)); wx.addColorStop(0.06, hexA(t, op));
-      wx.addColorStop(0.5, hexA(d, op));
-      wx.addColorStop(0.94, hexA(t, op)); wx.addColorStop(1, hexA(t, 0));
+      const op = settings.bgChannelOpacity, wx = ctx.createLinearGradient(CH_L, 0, CH_R, 0);
+      wx.addColorStop(0, rgbaOf(wTop, 0)); wx.addColorStop(0.06, rgbaOf(wTop, op));
+      wx.addColorStop(0.5, rgbaOf(wBot, op));
+      wx.addColorStop(0.94, rgbaOf(wTop, op)); wx.addColorStop(1, rgbaOf(wTop, 0));
       ctx.fillStyle = wx; ctx.fillRect(CH_L, 0, CH_R - CH_L, H);
     } else {
       const wx = ctx.createLinearGradient(CH_L, 0, CH_R, 0);
-      wx.addColorStop(0, settings.waterTop); wx.addColorStop(0.5, settings.waterBottom); wx.addColorStop(1, settings.waterTop);
+      wx.addColorStop(0, wTop); wx.addColorStop(0.5, wBot); wx.addColorStop(1, wTop);
       ctx.fillStyle = wx; ctx.fillRect(CH_L, 0, CH_R - CH_L, H);
     }
 
@@ -922,6 +1026,10 @@
     }
 
     if (!bgReady) paintForestEdges();         // sandy shore + scrolling pine trees
+
+    // Biome mood wash over the whole scene (crossfades when entering a new land).
+    if (biomeFade > 0) { drawTint(BIOMES[biomePrevIdx].tint, biomeFade); drawTint(BIOMES[biomeIdx].tint, 1 - biomeFade); }
+    else drawTint(BIOMES[biomeIdx].tint, 1);
   }
 
   function paintForestEdges() {
@@ -974,7 +1082,7 @@
       const x = rand(CH_L, CH_R - 40);
       ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 30, y - 4); ctx.stroke();
     }
-    ctx.fillStyle = "#fff"; ctx.font = "bold 22px " + UI_FONT; ctx.textAlign = "center";
+    ctx.fillStyle = "#fff"; ctx.font = "bold 22px " + UI_FONT; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.globalAlpha = 0.6 + 0.4 * Math.abs(Math.sin(gameClock * 6));
     ctx.fillText("🌊 RAPIDS! 🌊", W / 2, 92); ctx.globalAlpha = 1;
   }
@@ -1137,26 +1245,8 @@
     ctx.fillStyle = "#d9a91f"; roundRect(-size * 0.12, -size * 0.4, size * 0.24, size * 0.2, 4); ctx.fill();       // conning tower
     ctx.fillStyle = "#bfe3ff"; ctx.beginPath(); ctx.arc(size * 0.16, 0, size * 0.12, 0, Math.PI * 2); ctx.fill();  // porthole
   }
-  // Olive the cavapoo 🐶 — a BLACK cavapoo with a white spot under her chin. Joins after Level 7.
-  function drawOlive(x, y, s) {
-    ctx.save(); ctx.translate(x, y);
-    const black = "#2c2a2b", blackD = "#1b1a1b", white = "#f4f1ea", nose = "#565457", shine = "#ffffff";
-    ctx.fillStyle = black; ctx.beginPath(); ctx.ellipse(0, s * 0.2, s * 0.34, s * 0.27, 0, 0, Math.PI * 2); ctx.fill();          // body
-    ctx.fillStyle = blackD;                                                                                                      // floppy ears
-    ctx.beginPath(); ctx.ellipse(-s * 0.27, -s * 0.04, s * 0.13, s * 0.21, 0.4, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(s * 0.27, -s * 0.04, s * 0.13, s * 0.21, -0.4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = black; ctx.beginPath(); ctx.arc(0, -s * 0.12, s * 0.3, 0, Math.PI * 2); ctx.fill();                          // head
-    ctx.fillStyle = white; ctx.beginPath(); ctx.ellipse(0, s * 0.16, s * 0.11, s * 0.12, 0, 0, Math.PI * 2); ctx.fill();         // white spot UNDER the chin (on top of head/chest)
-    ctx.fillStyle = "#0d0c0d";                                                                                                   // eyes
-    ctx.beginPath(); ctx.arc(-s * 0.1, -s * 0.15, s * 0.06, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(s * 0.1, -s * 0.15, s * 0.06, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = shine;                                                                                                       // eye glints (so eyes read on black)
-    ctx.beginPath(); ctx.arc(-s * 0.08, -s * 0.17, s * 0.022, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(s * 0.12, -s * 0.17, s * 0.022, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = nose; ctx.beginPath(); ctx.arc(0, -s * 0.03, s * 0.055, 0, Math.PI * 2); ctx.fill();                         // nose
-    ctx.fillStyle = "#ff8fa3"; ctx.beginPath(); ctx.ellipse(0, s * 0.05, s * 0.04, s * 0.05, 0, 0, Math.PI * 2); ctx.fill();     // tongue
-    ctx.restore();
-  }
+  // Olive the cavapoo 🐶 — mostly black, white chin + bib. Joins after Level 7 (Mt. Shasta rest stop).
+  function drawOlive(x, y, s) { drawOliveCtx(ctx, x, y, s); }
   // A friendly river otter 🦦 — swims alongside the boat after Level 5.
   function drawOtter(x, y, s) {
     ctx.save(); ctx.translate(x, y);
@@ -1197,7 +1287,7 @@
     ctx.fillStyle = "#fff"; ctx.font = "bold 22px " + UI_FONT; ctx.textAlign = "left";
     ctx.fillText("⭐ " + Math.floor(score), 14, 36);
     ctx.fillStyle = "#cfe7ff"; ctx.font = "bold 14px " + UI_FONT;
-    ctx.fillText("Level " + level + "   🪙 " + save.wallet, 16, 58);
+    ctx.fillText("Lv " + level + "  🪙 " + save.wallet + "  🏁 " + Math.floor(distance / 8) + "m", 16, 58);
     ctx.textAlign = "right"; ctx.font = "20px " + EMOJI_FONT;
     ctx.fillText("❤️".repeat(Math.max(0, lives)), W - 12, 36);
     const m = comboMult();
@@ -1268,6 +1358,29 @@
     });
   }
 
+  // Draw Olive the cavapoo onto a given 2D context — used on the splash mini-canvas.
+  function drawOliveCtx(ox, cx, cy, s) {
+    ox.save(); ox.translate(cx, cy);
+    const black = "#2c2a2b", blackD = "#1b1a1b", white = "#f4f1ea", nose = "#565457", shine = "#ffffff";
+    ox.fillStyle = black; ox.beginPath(); ox.ellipse(0, s*0.2, s*0.34, s*0.27, 0, 0, Math.PI*2); ox.fill();
+    ox.fillStyle = blackD;
+    ox.beginPath(); ox.ellipse(-s*0.27, -s*0.04, s*0.13, s*0.21, 0.4, 0, Math.PI*2); ox.fill();
+    ox.beginPath(); ox.ellipse(s*0.27, -s*0.04, s*0.13, s*0.21, -0.4, 0, Math.PI*2); ox.fill();
+    ox.fillStyle = black; ox.beginPath(); ox.arc(0, -s*0.12, s*0.3, 0, Math.PI*2); ox.fill();
+    ox.fillStyle = white;
+    ox.beginPath(); ox.ellipse(0, s*0.07, s*0.14, s*0.1, 0, 0, Math.PI*2); ox.fill();
+    ox.beginPath(); ox.ellipse(0, s*0.22, s*0.18, s*0.13, 0, 0, Math.PI*2); ox.fill();
+    ox.fillStyle = "#0d0c0d";
+    ox.beginPath(); ox.arc(-s*0.1, -s*0.15, s*0.06, 0, Math.PI*2); ox.fill();
+    ox.beginPath(); ox.arc(s*0.1, -s*0.15, s*0.06, 0, Math.PI*2); ox.fill();
+    ox.fillStyle = shine;
+    ox.beginPath(); ox.arc(-s*0.08, -s*0.17, s*0.022, 0, Math.PI*2); ox.fill();
+    ox.beginPath(); ox.arc(s*0.12, -s*0.17, s*0.022, 0, Math.PI*2); ox.fill();
+    ox.fillStyle = nose; ox.beginPath(); ox.arc(0, -s*0.03, s*0.055, 0, Math.PI*2); ox.fill();
+    ox.fillStyle = "#ff8fa3"; ox.beginPath(); ox.ellipse(0, s*0.05, s*0.04, s*0.05, 0, 0, Math.PI*2); ox.fill();
+    ox.restore();
+  }
+
   function showSplash() {
     state = "splash";
     const word = "E BROTHERS";
@@ -1281,14 +1394,25 @@
       <div class="pres">presents</div>
       <div class="logo">${letters}</div>
       <div class="corp">GAMING CORP.</div>
-      <div class="crew"><span class="b">🛶</span> <span class="b2">🐶</span></div>
+      <div style="font-size:12px;color:#a8d8ff;animation:fadeUp .5s ease backwards .9s;margin:-2px 0 4px;letter-spacing:1px;">🚗 Bay Area → Sunriver, OR</div>
+      <div class="crew"><span class="b">🛶</span> <canvas id="oliveSplash" width="80" height="80" style="width:50px;height:50px;display:inline-block;vertical-align:middle;" class="b2"></canvas></div>
       <div class="tap">tap to start</div>`;
     splash.style.display = "flex";
+    // Draw Olive on the mini canvas inside the splash
+    const oc = document.getElementById("oliveSplash");
+    if (oc) {
+      const ox = oc.getContext("2d");
+      ox.fillStyle = "rgba(50,130,190,0.18)";
+      ox.beginPath(); ox.arc(40, 40, 36, 0, Math.PI * 2); ox.fill();   // subtle halo so black dog reads on dark bg
+      drawOliveCtx(ox, 40, 40, 30);
+    }
     let done = false;
     const go = () => {
       if (done) return; done = true;
       clearTimeout(tid); splash.onclick = null; window.removeEventListener("keydown", skip);
-      splash.style.display = "none"; showSelect();
+      splash.style.display = "none";
+      let seen = false; try { seen = localStorage.getItem("riverRunSeenHow"); } catch (e) {}
+      seen ? showSelect() : showHowTo();   // first-timers get a quick how-to
     };
     const skip = () => go();
     splash.onclick = () => { ensureAudio(); go(); };
@@ -1298,18 +1422,36 @@
 
   function boatIcon(key, emoji) { return key === "tube" ? '<span class="tube-icon"></span>' : `<span>${emoji}</span>`; }
 
+  function showHowTo() {
+    state = "howto";
+    showOverlay(`<h2>How to play 🛶</h2>
+      <p style="text-align:left">🚗 The family's road-tripping from the <b>SF Bay Area to Sunriver, OR</b> — stopping to run every river along the way!</p>
+      <p style="text-align:left">⬅️ ➡️ <b>Steer</b> with the arrow keys, the ◀ ▶ buttons, or <b>drag your finger</b> across the river.</p>
+      <p style="text-align:left">⤴ <b>Jump</b> (Space / Jump button) hops over 🪨 rocks, logs &amp; sticks.</p>
+      <p style="text-align:left">🪙 <b>Grab coins</b> to fill your shop budget — 💎 gems are worth more!</p>
+      <p style="text-align:left">🐟 🚣 <b>Dodge</b> fish &amp; boats — you can't jump those. ❤️ are your lives.</p>
+      <p style="text-align:left">⭐ Survive ${settings.levelDuration}s to <b>level up</b> — the scenery changes as the trip rolls north: 🌉 Bay Delta → 🌾 Central Valley → 🏔️ Mt. Shasta → 🏞️ Shasta Lake → 🌲 Klamath River → ☀️ Sunriver!</p>
+      <button id="howGo" class="primary">Let's go! ▶</button>`);
+    document.getElementById("howGo").onclick = () => { try { localStorage.setItem("riverRunSeenHow", "1"); } catch (e) {} ensureAudio(); showSelect(); };
+  }
+
   function showSelect() {
     state = "select";
     showOverlay(`
-      <h2>🛶 River Run</h2>
-      <p>Budget: 🪙 <b>${save.wallet}</b></p>
-      <p>Pick a boat to start</p>
+      <h2>🚗 Road Trip River Run</h2>
+      <p style="color:#9fd0ff;font-size:13px;margin:-2px 0 6px;">Bay Area → Sunriver, OR 🏕️</p>
+      <p>Coins: 🪙 <b>${save.wallet}</b></p>
+      <h3>Difficulty</h3>
+      <div class="diffs">
+        ${Object.keys(DIFFICULTIES).map(k => `<button class="diff-btn ${save.difficulty === k ? "sel" : ""}" data-diff="${k}">${DIFFICULTIES[k].label}</button>`).join("")}
+      </div>
+      <h3>Pick a boat to start</h3>
       <div class="boats">
         <button class="boat-btn" data-boat="canoe"><span>🛶</span>Canoe</button>
         <button class="boat-btn" data-boat="tube"><span class="tube-icon"></span>Lazy Tube</button>
       </div>
       <div class="row"><button id="dockBtn" class="secondary">🛟 Dock &amp; Shop</button></div>
-      <div class="how">Steer ← ↑ → ↓ · Space = jump/dive · grab 🪙 · dodge 🪨 · level up every ${settings.levelDuration}s</div>
+      <div class="how">${escapeHtml(diff().hint)} · level up every ${settings.levelDuration}s · <a id="howLink" style="color:#9fd0ff;text-decoration:underline;cursor:pointer">How to play</a></div>
       <h3 id="boardTitle">🏆 Leaderboard</h3>
       <div id="boardWrap">${boardHTML(loadBoard().slice(0, 10))}</div>
       <p class="muted" style="margin-top:14px;font-size:12px;">🎮 E Brothers Gaming Corp. · by Ezra &amp; Eli Simon-Harris · © 2026</p>
@@ -1317,6 +1459,8 @@
     overlay.querySelectorAll(".boat-btn").forEach(btn => btn.onclick = () => {
       chosenBoat = btn.dataset.boat; save.chosenBoat = chosenBoat; persist(); ensureAudio(); hideOverlay(); startGame();
     });
+    overlay.querySelectorAll("[data-diff]").forEach(b => b.onclick = () => { save.difficulty = b.dataset.diff; persist(); showSelect(); });
+    const howLink = document.getElementById("howLink"); if (howLink) howLink.onclick = () => showHowTo();
     document.getElementById("dockBtn").onclick = () => { ensureAudio(); showDock("select"); };
     paintBoard("boardWrap", "boardTitle", null);
   }
@@ -1353,11 +1497,25 @@
     };
   }
 
+  const TRIP_NARRATIVE = [
+    "The Sacramento-San Joaquin Delta is wild — stay on course! 🌊",
+    "Blazing through the Central Valley heat — the river's picking up speed! ☀️",
+    "Mt. Shasta in the windshield — the McCloud River is ice-cold and rushing! 🏔️",
+    "Shasta Lake — biggest reservoir in California, and the current underneath is wild! 🏞️",
+    "The Klamath River cuts through the Siskiyous — raw and fast! 🌲",
+    "Final stretch on the Deschutes — Sunriver straight ahead! 🎉",
+  ];
+  function tripNarrative(lvl) {
+    return TRIP_NARRATIVE[Math.min(Math.floor((Math.max(1, lvl) - 1) / BIOME_EVERY), TRIP_NARRATIVE.length - 1)];
+  }
+
   function showLevelComplete(completed) {
-    let html = `<h2>Level ${completed} complete! 🎉</h2><p>Score: <b>${Math.floor(score)}</b> · Budget: <b>${save.wallet} 🪙</b></p>`;
+    let html = `<h2>Level ${completed} complete! 🎉</h2>`;
+    html += `<p style="color:#9fd0ff;font-size:13px;">${tripNarrative(completed)}</p>`;
+    html += `<p>Score: <b>${Math.floor(score)}</b> · Coins: <b>${save.wallet} 🪙</b></p>`;
     if (level % settings.checkpointEvery === 0) html += `<p>⛳ <b>Checkpoint reached — Level ${level}!</b></p>`;
-    if (otterJustJoined) html += `<p style="font-size:15px;background:#16513c;border-radius:10px;padding:9px 11px;">🦦 <b>Surprise! A friendly river otter joined your crew — and gave you an extra life ❤️!</b> She swims alongside you from now on. 🎉</p>`;
-    if (oliveJustJoined) html += `<p style="font-size:15px;background:#16513c;border-radius:10px;padding:9px 11px;">🐶 <b>Surprise! Olive the Cavapoo hopped aboard your boat!</b> She rides with you from now on. 🎉</p>`;
+    if (otterJustJoined) html += `<p style="font-size:15px;background:#16513c;border-radius:10px;padding:9px 11px;">🦦 <b>Surprise! A Klamath River otter decided this road trip looked fun — and gave you an extra ❤️!</b> She swims alongside from now on. 🎉</p>`;
+    if (oliveJustJoined) html += `<p style="font-size:15px;background:#16513c;border-radius:10px;padding:9px 11px;">🐶 <b>Surprise! Olive spotted the family's car at a Mt. Shasta rest stop and leaped in!</b> She's coming all the way to Sunriver and riding along on the boat. 🎉</p>`;
     if (completed === 1) {
       const pref = escapeHtml(playerName || save.lastName || "");
       html += `<p>For the leaderboard — who's playing? Keep the name or type a new one (a different player can take over), then Save. Optional.</p>
@@ -1382,7 +1540,13 @@
 
   function showGameOver() {
     const hasScore = Math.floor(score) > 0;
-    let html = `<h2>Game Over</h2><p>Score <b>${Math.floor(score)}</b> · reached <b>Level ${level}</b> · 🪙 ${save.wallet}</p>`;
+    const who = playerName || save.lastName || "";
+    const cheer = level >= 8 ? "Epic road trip" : level >= 5 ? "Great run" : level >= 3 ? "Nice paddle" : "Good start";
+    const meters = Math.floor(distance / 8);
+    const leg = TRIP_NARRATIVE[Math.min(Math.floor((Math.max(1, level) - 1) / BIOME_EVERY), TRIP_NARRATIVE.length - 1)];
+    let html = `<h2>${cheer}${who ? ", " + escapeHtml(who) : ""}! 🌟</h2>`;
+    html += `<p style="color:#9fd0ff;font-size:13px;">The family made it to <b>${BIOMES[biomeForLevel(level)].emoji} ${BIOMES[biomeForLevel(level)].name}</b></p>`;
+    html += `<p>Level <b>${level}</b> · <b>${meters}m</b> paddled · <b>${Math.floor(score)}</b> ⭐ · 🪙 ${save.wallet} for the road</p>`;
     if (checkpointLevel >= settings.checkpointEvery)
       html += `<div class="row"><button id="cont" class="primary">▶ Continue from Level ${checkpointLevel}</button></div>`;
     if (hasScore) {
@@ -1428,6 +1592,7 @@
     update(dt, sec); draw();
     requestAnimationFrame(loop);
   }
+  if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
   showSplash();
   requestAnimationFrame(loop);
   </script>
